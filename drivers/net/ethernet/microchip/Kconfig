@@ -46,9 +46,7 @@ config LAN743X
 	tristate "LAN743x support"
 	depends on PCI
 	select PHYLIB
-	select CRC16
-	select CRC32
-	help
+	---help---
 	  Support for the Microchip LAN743x PCI Express Gigabit Ethernet chip
 
 	  To compile this driver as a module, choose M here. The module will be
