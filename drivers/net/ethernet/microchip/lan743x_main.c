@@ -8,13 +8,13 @@
 #include <linux/crc32.h>
 #include <linux/microchipphy.h>
 #include <linux/net_tstamp.h>
-#include <linux/of_mdio.h>
-#include <linux/of_net.h>
 #include <linux/phy.h>
 #include <linux/phy_fixed.h>
 #include <linux/rtnetlink.h>
 #include <linux/iopoll.h>
 #include <linux/crc16.h>
+#include <linux/of_mdio.h>
+#include <linux/of_net.h>
 #include "lan743x_main.h"
 #include "lan743x_ethtool.h"
 
@@ -801,10 +801,9 @@ static int lan743x_mac_init(struct lan743x_adapter *adapter)
 
 	netdev = adapter->netdev;
 
-	/*  disable auto duplex, and speed detection. Phylib does that  */
+	/* setup auto duplex, and speed detection */
 	data = lan743x_csr_read(adapter, MAC_CR);
-	// data |= MAC_CR_ADD_ | MAC_CR_ASD_;
-    data &= ~(MAC_CR_ADD_ | MAC_CR_ASD_);
+	data |= MAC_CR_ADD_ | MAC_CR_ASD_;
 	data |= MAC_CR_CNTR_RST_;
 	lan743x_csr_write(adapter, MAC_CR, data);
 
@@ -950,47 +949,13 @@ static void lan743x_phy_link_status_change(struct net_device *netdev)
 {
 	struct lan743x_adapter *adapter = netdev_priv(netdev);
 	struct phy_device *phydev = netdev->phydev;
-    u32 data;
 
 	phy_print_status(phydev);
 	if (phydev->state == PHY_RUNNING) {
 		struct ethtool_link_ksettings ksettings;
 		int remote_advertisement = 0;
 		int local_advertisement = 0;
-        
-		data = lan743x_csr_read(adapter, MAC_CR);
 
-		/* set interface mode */
-		if (phy_interface_mode_is_rgmii(adapter->phy_mode))
-			/* RGMII */
-			data &= ~MAC_CR_MII_EN_;
-		else
-			/* GMII */
-			data |= MAC_CR_MII_EN_;
-
-		/* set duplex mode */
-		if (phydev->duplex)
-			data |= MAC_CR_DPX_;
-		else
-			data &= ~MAC_CR_DPX_;
-
-		/* set bus speed */
-		switch (phydev->speed) {
-		case SPEED_10:
-			data &= ~MAC_CR_CFG_H_;
-			data &= ~MAC_CR_CFG_L_;
-		break;
-		case SPEED_100:
-			data &= ~MAC_CR_CFG_H_;
-			data |= MAC_CR_CFG_L_;
-		break;
-		case SPEED_1000:
-			data |= MAC_CR_CFG_H_;
-			data |= MAC_CR_CFG_L_;
-		break;
-		}
-		lan743x_csr_write(adapter, MAC_CR, data);
-        
 		memset(&ksettings, 0, sizeof(ksettings));
 		phy_ethtool_get_link_ksettings(netdev, &ksettings);
 		local_advertisement =
@@ -1012,7 +977,11 @@ static void lan743x_phy_close(struct lan743x_adapter *adapter)
 
 	phy_stop(netdev->phydev);
 	phy_disconnect(netdev->phydev);
-	netdev->phydev = NULL;
+    
+    if (of_phy_is_fixed_link(adapter->pdev->dev.of_node))
+            of_phy_deregister_fixed_link(adapter->pdev->dev.of_node);
+	
+    netdev->phydev = NULL;
 }
 
 static int lan743x_phy_open(struct lan743x_adapter *adapter)
@@ -1020,57 +989,101 @@ static int lan743x_phy_open(struct lan743x_adapter *adapter)
 	struct lan743x_phy *phy = &adapter->phy;
 	struct phy_device *phydev;
 	struct net_device *netdev;
+    struct device_node *phynode;
+    u32 data;
+    phy_interface_t phyifc = PHY_INTERFACE_MODE_GMII;
+    bool fixed_link = false;
 	int ret = -EIO;
 	u32 mii_adv;
 
 	netdev = adapter->netdev;
-	phydev = phy_find_first(adapter->mdiobus);
-/*
-    if (!phydev)
-		goto return_error;
-*/
-	phynode = of_node_get(adapter->pdev->dev.of_node);
-	adapter->phy_mode = PHY_INTERFACE_MODE_GMII;
+	//phydev = phy_find_first(adapter->mdiobus);
+	//if (!phydev)
+	//	goto return_error;
 
-	if (phynode) {
-		of_get_phy_mode(phynode, &adapter->phy_mode);
+    phynode = of_node_get(adapter->pdev->dev.of_node);
+    if (phynode)
+            of_get_phy_mode(phynode, &phyifc);
 
-		if (of_phy_is_fixed_link(phynode)) {
-			ret = of_phy_register_fixed_link(phynode);
-			if (ret) {
-				netdev_err(netdev,
-					   "cannot register fixed PHY\n");
-				of_node_put(phynode);
-				goto return_error;
-			}
-		}
-		phydev = of_phy_connect(netdev, phynode,
-					lan743x_phy_link_status_change, 0,
-					adapter->phy_mode);
-		of_node_put(phynode);
-		if (!phydev)
-			goto return_error;
-	} else {
-		phydev = phy_find_first(adapter->mdiobus);
-		if (!phydev)
-			goto return_error;
+    /* check if a fixed-link is defined in device-tree */
+    if (phynode && of_phy_is_fixed_link(phynode)) {
+            fixed_link = true;
+            netdev_dbg(netdev, "fixed-link detected\n");
 
-/*
+            ret = of_phy_register_fixed_link(phynode);
+            if (ret) {
+                    netdev_err(netdev, "cannot register fixed PHY\n");
+                    goto return_error;
+            }
+    
+    
+/*   
 	ret = phy_connect_direct(netdev, phydev,
 				 lan743x_phy_link_status_change,
 				 PHY_INTERFACE_MODE_GMII);
 	if (ret)
 		goto return_error;
 */
+    
+            phydev = of_phy_connect(netdev, phynode,
+                                    lan743x_phy_link_status_change,
+                                    0, phyifc);
+            if (!phydev)
+                    goto return_error;
 
-		ret = phy_connect_direct(netdev, phydev,
-					 lan743x_phy_link_status_change,
-					 adapter->phy_mode);
-		if (ret)
-			goto return_error;
-	}
+            /* Configure MAC to fixed link parameters */
+            data = lan743x_csr_read(adapter, MAC_CR);
+            /* Disable auto negotiation */
+            data &= ~(MAC_CR_ADD_ | MAC_CR_ASD_);
+            /* Set duplex mode */
+            if (phydev->duplex)
+                    data |= MAC_CR_DPX_;
+            else
+                    data &= ~MAC_CR_DPX_;
+            /* Set bus speed */
+            switch (phydev->speed) {
+            case 10:
+                    data &= ~MAC_CR_CFG_H_;
+                    data &= ~MAC_CR_CFG_L_;
+                    break;
+            case 100:
+                    data &= ~MAC_CR_CFG_H_;
+                    data |= MAC_CR_CFG_L_;
+                    break;
+            case 1000:
+                    data |= MAC_CR_CFG_H_;
+                    data |= MAC_CR_CFG_L_;
+                    break;
+            }
+            /* Set interface mode */
+            if (phyifc == PHY_INTERFACE_MODE_RGMII ||
+                phyifc == PHY_INTERFACE_MODE_RGMII_ID ||
+                phyifc == PHY_INTERFACE_MODE_RGMII_RXID ||
+                phyifc == PHY_INTERFACE_MODE_RGMII_TXID)
+                    /* RGMII */
+                    data &= ~MAC_CR_MII_EN_;
+            else
+                    /* GMII */
+                    data |= MAC_CR_MII_EN_;
+            lan743x_csr_write(adapter, MAC_CR, data);
+    } else {
+            phydev = phy_find_first(adapter->mdiobus);
+            if (!phydev)
+                    goto return_error;
 
+            ret = phy_connect_direct(netdev, phydev,
+                                    lan743x_phy_link_status_change,
+                                    PHY_INTERFACE_MODE_GMII);
+            /* Note: We cannot use phyifc here because this would be SGMII
+            * on a standard PC.
+            */
+            if (ret)
+                    goto return_error;
+    }
 
+    if (phynode)
+            of_node_put(phynode);
+ 
 	/* MAC doesn't support 1000T Half */
 	phydev->supported &= ~SUPPORTED_1000baseT_Half;
 
@@ -1082,10 +1095,15 @@ static int lan743x_phy_open(struct lan743x_adapter *adapter)
 	phy->fc_autoneg = phydev->autoneg;
 
 	phy_start(phydev);
-	phy_start_aneg(phydev);
+//	phy_start_aneg(phydev);
+    if (!fixed_link)
+            phy_start_aneg(phydev);
+    
 	return 0;
 
 return_error:
+    if (phynode)
+        of_node_put(phynode);
 	return ret;
 }
 
@@ -2575,29 +2593,18 @@ static int lan743x_netdev_open(struct net_device *netdev)
 	if (ret)
 		goto return_error;
 
-    
-
-    netif_warn(adapter, ifup, adapter->netdev, "JOSEPH PASSED INITR OPEN\n");
-    
 	ret = lan743x_mac_open(adapter);
 	if (ret)
 		goto close_intr;
 
-    netif_warn(adapter, ifup, adapter->netdev, "JOSEPH PASSED MAC OPEN\n");
-    
 	ret = lan743x_phy_open(adapter);
 	if (ret)
 		goto close_mac;
 
-    netif_warn(adapter, ifup, adapter->netdev, "JOSEPH PASSED PHY OPEN\n");
-    
 	ret = lan743x_ptp_open(adapter);
 	if (ret)
 		goto close_phy;
 
-    
-    netif_warn(adapter, ifup, adapter->netdev, "JOSEPH PASSED PTP OPEN\n");
-    
 	lan743x_rfe_open(adapter);
 
 	for (index = 0; index < LAN743X_USED_RX_CHANNELS; index++) {
@@ -2606,15 +2613,10 @@ static int lan743x_netdev_open(struct net_device *netdev)
 			goto close_rx;
 	}
 
-	
-    netif_warn(adapter, ifup, adapter->netdev, "JOSEPH PASSED RX OPEN\n");
-	
 	ret = lan743x_tx_open(&adapter->tx[0]);
 	if (ret)
 		goto close_rx;
-    
-    netif_warn(adapter, ifup, adapter->netdev, "JOSEPH PASSED TX OPEN\n");
-    
+
 	return 0;
 
 close_rx:

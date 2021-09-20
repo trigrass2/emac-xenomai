@@ -4,7 +4,6 @@
 #ifndef _LAN743X_H
 #define _LAN743X_H
 
-#include <linux/phy.h>
 #include "lan743x_ptp.h"
 
 #define DRIVER_AUTHOR   "Bryan Whitehead <Bryan.Whitehead@microchip.com>"
@@ -103,10 +102,14 @@
 	((value << 0) & FCT_FLOW_CTL_ON_THRESHOLD_)
 
 #define MAC_CR				(0x100)
-#define MAC_CR_EEE_EN_			BIT(17)
+#define MAC_CR_MII_EN_      BIT(19)
+#define MAC_CR_EEE_EN_		BIT(17)
 #define MAC_CR_ADD_			BIT(12)
 #define MAC_CR_ASD_			BIT(11)
-#define MAC_CR_CNTR_RST_		BIT(5)
+#define MAC_CR_CNTR_RST_	BIT(5)
+#define MAC_CR_DPX_         BIT(3)
+#define MAC_CR_CFG_H_       BIT(2)
+#define MAC_CR_CFG_L_       BIT(1)
 #define MAC_CR_RST_			BIT(0)
 
 #define MAC_RX				(0x104)
@@ -695,7 +698,6 @@ struct lan743x_rx {
 struct lan743x_adapter {
 	struct net_device       *netdev;
 	struct mii_bus		*mdiobus;
-    phy_interface_t		phy_mode;
 	int                     msg_enable;
 #ifdef CONFIG_PM
 	u32			wolopts;
@@ -715,9 +717,6 @@ struct lan743x_adapter {
 	struct lan743x_phy      phy;
 	struct lan743x_tx       tx[LAN743X_MAX_TX_CHANNELS];
 	struct lan743x_rx       rx[LAN743X_MAX_RX_CHANNELS];
-#define LAN743X_ADAPTER_FLAG_OTP		BIT(0)
-	u32			flags;
-    
 };
 
 #define LAN743X_COMPONENT_FLAG_RX(channel)  BIT(20 + (channel))
