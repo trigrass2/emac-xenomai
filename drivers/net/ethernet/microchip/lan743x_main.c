@@ -2500,18 +2500,29 @@ static int lan743x_netdev_open(struct net_device *netdev)
 	if (ret)
 		goto return_error;
 
+    
+
+    netif_warn(adapter, ifup, adapter->netdev, "JOSEPH PASSED INITR OPEN\n");
+    
 	ret = lan743x_mac_open(adapter);
 	if (ret)
 		goto close_intr;
 
+    netif_warn(adapter, ifup, adapter->netdev, "JOSEPH PASSED MAC OPEN\n");
+    
 	ret = lan743x_phy_open(adapter);
 	if (ret)
 		goto close_mac;
 
+    netif_warn(adapter, ifup, adapter->netdev, "JOSEPH PASSED PHY OPEN\n");
+    
 	ret = lan743x_ptp_open(adapter);
 	if (ret)
 		goto close_phy;
 
+    
+    netif_warn(adapter, ifup, adapter->netdev, "JOSEPH PASSED PTP OPEN\n");
+    
 	lan743x_rfe_open(adapter);
 
 	for (index = 0; index < LAN743X_USED_RX_CHANNELS; index++) {
@@ -2520,10 +2531,15 @@ static int lan743x_netdev_open(struct net_device *netdev)
 			goto close_rx;
 	}
 
+	
+    netif_warn(adapter, ifup, adapter->netdev, "JOSEPH PASSED RX OPEN\n");
+	
 	ret = lan743x_tx_open(&adapter->tx[0]);
 	if (ret)
 		goto close_rx;
-
+    
+    netif_warn(adapter, ifup, adapter->netdev, "JOSEPH PASSED TX OPEN\n");
+    
 	return 0;
 
 close_rx:
