@@ -1003,7 +1003,7 @@ static int lan743x_phy_open(struct lan743x_adapter *adapter)
 
     phynode = of_node_get(adapter->pdev->dev.of_node);
     if (phynode)
-        of_get_phy_mode(phynode, &phyifc);
+        of_get_phy_mode_new(phynode, &phyifc);
 
     /* check if a fixed-link is defined in device-tree */
     if (phynode && of_phy_is_fixed_link(phynode)) {
