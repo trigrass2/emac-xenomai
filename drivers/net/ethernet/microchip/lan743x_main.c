@@ -1068,7 +1068,7 @@ static int lan743x_phy_open(struct lan743x_adapter *adapter)
     } else {
             phydev = phy_find_first(adapter->mdiobus);
             if (!phydev)
-                    goto return_error;
+                goto return_error;
 
             ret = phy_connect_direct(netdev, phydev,
                                     lan743x_phy_link_status_change,
