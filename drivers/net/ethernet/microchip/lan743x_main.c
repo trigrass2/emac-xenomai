@@ -1003,18 +1003,18 @@ static int lan743x_phy_open(struct lan743x_adapter *adapter)
 
     phynode = of_node_get(adapter->pdev->dev.of_node);
     if (phynode)
-            of_get_phy_mode(phynode, &phyifc);
+        of_get_phy_mode(phynode, &phyifc);
 
     /* check if a fixed-link is defined in device-tree */
     if (phynode && of_phy_is_fixed_link(phynode)) {
-            fixed_link = true;
-            netdev_dbg(netdev, "fixed-link detected\n");
+        fixed_link = true;
+        netdev_dbg(netdev, "fixed-link detected\n");
 
-            ret = of_phy_register_fixed_link(phynode);
-            if (ret) {
-                    netdev_err(netdev, "cannot register fixed PHY\n");
-                    goto return_error;
-            }
+        ret = of_phy_register_fixed_link(phynode);
+        if (ret) {
+                netdev_err(netdev, "cannot register fixed PHY\n");
+                goto return_error;
+        }
     
     
 /*   
@@ -1037,9 +1037,9 @@ static int lan743x_phy_open(struct lan743x_adapter *adapter)
             data &= ~(MAC_CR_ADD_ | MAC_CR_ASD_);
             /* Set duplex mode */
             if (phydev->duplex)
-                    data |= MAC_CR_DPX_;
+                data |= MAC_CR_DPX_;
             else
-                    data &= ~MAC_CR_DPX_;
+                data &= ~MAC_CR_DPX_;
             /* Set bus speed */
             switch (phydev->speed) {
             case 10:
@@ -1060,11 +1060,10 @@ static int lan743x_phy_open(struct lan743x_adapter *adapter)
                 phyifc == PHY_INTERFACE_MODE_RGMII_ID ||
                 phyifc == PHY_INTERFACE_MODE_RGMII_RXID ||
                 phyifc == PHY_INTERFACE_MODE_RGMII_TXID)
-                    /* RGMII */
-                    data &= ~MAC_CR_MII_EN_;
+                data &= ~MAC_CR_MII_EN_; /* RGMII */
             else
-                    /* GMII */
-                    data |= MAC_CR_MII_EN_;
+                /* GMII */
+                data |= MAC_CR_MII_EN_;
             lan743x_csr_write(adapter, MAC_CR, data);
     } else {
             phydev = phy_find_first(adapter->mdiobus);
@@ -1078,11 +1077,11 @@ static int lan743x_phy_open(struct lan743x_adapter *adapter)
             * on a standard PC.
             */
             if (ret)
-                    goto return_error;
+                goto return_error;
     }
 
     if (phynode)
-            of_node_put(phynode);
+        of_node_put(phynode);
  
 	/* MAC doesn't support 1000T Half */
 	phydev->supported &= ~SUPPORTED_1000baseT_Half;
