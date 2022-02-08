@@ -304,11 +304,11 @@ static void port_setup(struct ksz_device *dev, int port, bool cpu_port)
 	u8 data8;
 	u16 data16;
 
-	/* disable tag tail for host port
+	/* disable tag tail for host port */
 	if (cpu_port)
 		ksz_port_cfg(dev, port, REG_PORT_CTRL_0, PORT_TAIL_TAG_ENABLE,
 			     true);
-    */
+    
 	ksz_port_cfg(dev, port, REG_PORT_CTRL_0, PORT_MAC_LOOPBACK, false);
 
 	/* set back pressure */
@@ -333,7 +333,7 @@ static void port_setup(struct ksz_device *dev, int port, bool cpu_port)
 	/* enable 802.1p priority */
 	ksz_port_cfg(dev, port, P_PRIO_CTRL, PORT_802_1P_PRIO_ENABLE, true);
 
-	/* configure MAC to 10MB & RGMII with Ingress delay mode */
+	/* configure MAC to 1 GB & RGMII with Ingress delay mode */
 	ksz_pread8(dev, port, REG_PORT_XMII_CTRL_1, &data8);
 	data8 |= PORT_RGMII_ID_IG_ENABLE;
 	data8 &= ~PORT_MII_NOT_1GBIT;
