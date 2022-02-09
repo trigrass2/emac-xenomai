@@ -1717,6 +1717,14 @@ void phy_remove_link_mode(struct phy_device *phydev, u32 link_mode)
 }
 EXPORT_SYMBOL(phy_remove_link_mode);
 
+static void phy_copy_pause_bits(unsigned long *dst, unsigned long *src)
+{
+	linkmode_mod_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT, dst,
+		linkmode_test_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT, src));
+	linkmode_mod_bit(ETHTOOL_LINK_MODE_Pause_BIT, dst,
+		linkmode_test_bit(ETHTOOL_LINK_MODE_Pause_BIT, src));
+}
+
 /**
  * phy_advertise_supported - Advertise all supported modes
  * @phydev: target phy_device struct
