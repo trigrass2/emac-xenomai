@@ -918,6 +918,8 @@ void phy_remove_link_mode(struct phy_device *phydev, u32 link_mode);
 void phy_advertise_supported(struct phy_device *phydev);
 void phy_support_asym_pause(struct phy_device *phydev);
 
+void phy_set_asym_pause(struct phy_device *phydev, bool rx, bool tx);
+
 int phy_register_fixup(const char *bus_id, u32 phy_uid, u32 phy_uid_mask,
 		       int (*run)(struct phy_device *));
 int phy_register_fixup_for_id(const char *bus_id,
