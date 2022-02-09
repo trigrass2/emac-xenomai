@@ -2548,28 +2548,28 @@ static int lan743x_netdev_open(struct net_device *netdev)
 	int index;
 	int ret;
 
-    prink("opening up device\n" );
+    printk("opening up device\n" );
     
 	ret = lan743x_intr_open(adapter);
 	if (ret)
 		goto return_error;
     
-    prink("opened up device\n" );
+    printk("opened up device\n" );
 	ret = lan743x_mac_open(adapter);
 	if (ret)
 		goto close_intr;
 
-    prink("MAC IS OPEN\n" );
+    printk("MAC IS OPEN\n" );
 	ret = lan743x_phy_open(adapter);
 	if (ret)
 		goto close_mac;
     
-    prink("PHY IS OPEN\n" );
+    printk("PHY IS OPEN\n" );
 	ret = lan743x_ptp_open(adapter);
 	if (ret)
 		goto close_phy;
 
-    prink("PTP opened\n" );
+    printk("PTP opened\n" );
 	lan743x_rfe_open(adapter);
 
 	for (index = 0; index < LAN743X_USED_RX_CHANNELS; index++) {
@@ -2578,12 +2578,12 @@ static int lan743x_netdev_open(struct net_device *netdev)
 			goto close_rx;
 	}
 
-    prink("TX is open \n" );
+    printk("TX is open \n" );
 	ret = lan743x_tx_open(&adapter->tx[0]);
 	if (ret)
 		goto close_rx;
 
-    prink( "RX is open \n" );
+    printk( "RX is open \n" );
     
 	return 0;
 
