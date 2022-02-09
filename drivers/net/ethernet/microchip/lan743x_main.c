@@ -1021,10 +1021,11 @@ static int lan743x_phy_open(struct lan743x_adapter *adapter)
 	struct phy_device *phydev;
 	struct net_device *netdev;
 	int ret = -EIO;
+    u32 mii_adv;
 
 	netdev = adapter->netdev;
 	phynode = of_node_get(adapter->pdev->dev.of_node);
-	adapter->phy_mode = PHY_INTERFACE_MODE_GMII;
+	adapter->phy_mode = PHY_INTERFACE_MODE_RGMII_RXID;
 
 	if (phynode) {
 		of_get_phy_mode_new(phynode, &adapter->phy_mode);
@@ -1057,11 +1058,13 @@ static int lan743x_phy_open(struct lan743x_adapter *adapter)
 	}
 
 	/* MAC doesn't support 1000T Half */
-	phy_remove_link_mode(phydev, ETHTOOL_LINK_MODE_1000baseT_Half_BIT);
+    phydev->supported &= ~SUPPORTED_1000baseT_Half;
 
 	/* support both flow controls */
-	phy_support_asym_pause(phydev);
 	phy->fc_request_control = (FLOW_CTRL_RX | FLOW_CTRL_TX);
+	phydev->advertising &= ~(ADVERTISED_Pause | ADVERTISED_Asym_Pause);
+	mii_adv = (u32)mii_advertise_flowctrl(phy->fc_request_control);
+	phydev->advertising |= mii_adv_to_ethtool_adv_t(mii_adv);
 	phy->fc_autoneg = phydev->autoneg;
 
 	phy_start(phydev);
@@ -2560,7 +2563,8 @@ static int lan743x_netdev_open(struct net_device *netdev)
 	ret = lan743x_phy_open(adapter);
 	if (ret)
 		goto close_mac;
-
+    
+    prink("PHY IS OPEN\n" );
 	ret = lan743x_ptp_open(adapter);
 	if (ret)
 		goto close_phy;
