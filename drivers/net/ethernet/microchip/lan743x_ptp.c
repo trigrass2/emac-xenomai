@@ -919,7 +919,7 @@ static void lan743x_ptp_sync_to_system_clock(struct lan743x_adapter *adapter)
 {
 	struct timespec64 ts;
 
-	ktime_get_clocktai_ts64(&ts);
+	ktime_get_clocktai(&ts);
 
 	lan743x_ptp_clock_set(adapter, ts.tv_sec, ts.tv_nsec, 0);
 }
@@ -1265,9 +1265,11 @@ int lan743x_ptp_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
 
 		lan743x_ptp_set_sync_ts_insert(adapter, true);
 		break;
+        /*
 	case HWTSTAMP_TX_ONESTEP_P2P:
 		ret = -ERANGE;
 		break;
+        */
 	default:
 		netif_warn(adapter, drv, adapter->netdev,
 			   "  tx_type = %d, UNKNOWN\n", config.tx_type);
