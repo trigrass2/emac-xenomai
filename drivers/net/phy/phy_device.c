@@ -1767,6 +1767,18 @@ void phy_set_asym_pause(struct phy_device *phydev, bool rx, bool tx)
 }
 EXPORT_SYMBOL(phy_set_asym_pause);
 
+/**
+ * phy_support_asym_pause - Enable support of asym pause
+ * @phydev: target phy_device struct
+ *
+ * Description: Called by the MAC to indicate is supports Asym Pause.
+ */
+void phy_support_asym_pause(struct phy_device *phydev)
+{
+	phy_copy_pause_bits(phydev->advertising, phydev->supported);
+}
+EXPORT_SYMBOL(phy_support_asym_pause);
+
 static int __set_phy_supported(struct phy_device *phydev, u32 max_speed)
 {
 	phydev->supported &= ~(PHY_1000BT_FEATURES | PHY_100BT_FEATURES |
