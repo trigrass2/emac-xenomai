@@ -959,35 +959,34 @@ static void lan743x_phy_link_status_change(struct net_device *netdev)
 
 		data = lan743x_csr_read(adapter, MAC_CR);
 
-		/* set interface mode */
-		if (phy_interface_mode_is_rgmii(adapter->phy_mode))
-			/* RGMII */
-			data &= ~MAC_CR_MII_EN_;
-		else
-			/* GMII */
-			data |= MAC_CR_MII_EN_;
-
+		/* set interface mode to RGMII */
+        data &= ~MAC_CR_MII_EN_;
+		
 		/* set duplex mode */
 		if (phydev->duplex)
 			data |= MAC_CR_DPX_;
 		else
 			data &= ~MAC_CR_DPX_;
 
-		/* set bus speed */
+		/* set bus speed
 		switch (phydev->speed) {
 		case SPEED_10:
 			data &= ~MAC_CR_CFG_H_;
 			data &= ~MAC_CR_CFG_L_;
 		break;
 		case SPEED_100:
-			data &= ~MAC_CR_CFG_H_;
-			data |= MAC_CR_CFG_L_;
-		break;
+        */
+        data &= ~MAC_CR_CFG_H_;
+        data |= MAC_CR_CFG_L_;
+		/*
+            break;
 		case SPEED_1000:
 			data |= MAC_CR_CFG_H_;
 			data &= ~MAC_CR_CFG_L_;
 		break;
 		}
+		*/
+        
 		lan743x_csr_write(adapter, MAC_CR, data);
 
 		memset(&ksettings, 0, sizeof(ksettings));
@@ -1025,7 +1024,7 @@ static int lan743x_phy_open(struct lan743x_adapter *adapter)
 
 	netdev = adapter->netdev;
 	phynode = of_node_get(adapter->pdev->dev.of_node);
-	adapter->phy_mode = PHY_INTERFACE_MODE_RGMII_RXID;
+	adapter->phy_mode = PHY_INTERFACE_MODE_GMII;
 
 	if (phynode) {
 		of_get_phy_mode_new(phynode, &adapter->phy_mode);
@@ -2548,28 +2547,28 @@ static int lan743x_netdev_open(struct net_device *netdev)
 	int index;
 	int ret;
 
-    printk("opening up device\n" );
+    printk("lan743x: opening up device\n" );
     
 	ret = lan743x_intr_open(adapter);
 	if (ret)
 		goto return_error;
     
-    printk("opened up device\n" );
+    printk("lan743x: opened up device\n" );
 	ret = lan743x_mac_open(adapter);
 	if (ret)
 		goto close_intr;
 
-    printk("MAC IS OPEN\n" );
+    printk("lan743x: MAC IS OPEN\n" );
 	ret = lan743x_phy_open(adapter);
 	if (ret)
 		goto close_mac;
     
-    printk("PHY IS OPEN\n" );
+    printk("lan743x: PHY IS OPEN\n" );
 	ret = lan743x_ptp_open(adapter);
 	if (ret)
 		goto close_phy;
 
-    printk("PTP opened\n" );
+    printk("lan743x: PTP opened\n" );
 	lan743x_rfe_open(adapter);
 
 	for (index = 0; index < LAN743X_USED_RX_CHANNELS; index++) {
@@ -2578,12 +2577,12 @@ static int lan743x_netdev_open(struct net_device *netdev)
 			goto close_rx;
 	}
 
-    printk("TX is open \n" );
+    printk("lan743x: TX is open \n" );
 	ret = lan743x_tx_open(&adapter->tx[0]);
 	if (ret)
 		goto close_rx;
 
-    printk( "RX is open \n" );
+    printk( "lan743x: RX is open \n" );
     
 	return 0;
 
