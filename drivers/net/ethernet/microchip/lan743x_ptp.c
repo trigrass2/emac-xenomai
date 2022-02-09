@@ -919,8 +919,8 @@ static void lan743x_ptp_sync_to_system_clock(struct lan743x_adapter *adapter)
 {
 	struct timespec64 ts;
 
-	ktime_get_clocktai(&ts);
-
+    ktime_get_clocktai_ts64(&ts);
+    
 	lan743x_ptp_clock_set(adapter, ts.tv_sec, ts.tv_nsec, 0);
 }
 
