@@ -1025,7 +1025,7 @@ static int lan743x_phy_open(struct lan743x_adapter *adapter)
 
 	if (phynode) {
 		/* try devicetree phy, or fixed link */
-		of_get_phy_mode(phynode, &adapter->phy_mode);
+		of_get_phy_mode(phynode);
 
 		if (of_phy_is_fixed_link(phynode)) {
 			ret = of_phy_register_fixed_link(phynode);
@@ -1057,11 +1057,14 @@ static int lan743x_phy_open(struct lan743x_adapter *adapter)
 	}
 
 	/* MAC doesn't support 1000T Half */
-	phy_remove_link_mode(phydev, ETHTOOL_LINK_MODE_1000baseT_Half_BIT);
-
+	// phy_remove_link_mode(phydev, ETHTOOL_LINK_MODE_1000baseT_Half_BIT);
+    phydev->supported &= ~SUPPORTED_1000baseT_Half;
+    
 	/* support both flow controls */
-	phy_support_asym_pause(phydev);
 	phy->fc_request_control = (FLOW_CTRL_RX | FLOW_CTRL_TX);
+	phydev->advertising &= ~(ADVERTISED_Pause | ADVERTISED_Asym_Pause);
+	mii_adv = (u32)mii_advertise_flowctrl(phy->fc_request_control);
+	phydev->advertising |= mii_adv_to_ethtool_adv_t(mii_adv);
 	phy->fc_autoneg = phydev->autoneg;
 
 	phy_start(phydev);
