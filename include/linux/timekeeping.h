@@ -196,11 +196,6 @@ static inline ktime_t ktime_get_boottime(void)
 	return ktime_get_with_offset(TK_OFFS_BOOT);
 }
 
-static inline void ktime_get_clocktai_ts64(struct timespec64 *ts)
-{
-	*ts = ktime_to_timespec64(ktime_get_clocktai());
-}
-
 /**
  * ktime_get_clocktai - Returns the TAI time of day in ktime_t format
  */
@@ -208,6 +203,12 @@ static inline ktime_t ktime_get_clocktai(void)
 {
 	return ktime_get_with_offset(TK_OFFS_TAI);
 }
+
+static inline void ktime_get_clocktai_ts64(struct timespec64 *ts)
+{
+	*ts = ktime_to_timespec64(ktime_get_clocktai());
+}
+
 
 /**
  * ktime_mono_to_real - Convert monotonic time to clock realtime

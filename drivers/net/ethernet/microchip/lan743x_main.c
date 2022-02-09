@@ -991,9 +991,9 @@ static void lan743x_phy_link_status_change(struct net_device *netdev)
 		memset(&ksettings, 0, sizeof(ksettings));
 		phy_ethtool_get_link_ksettings(netdev, &ksettings);
 		local_advertisement =
-			linkmode_adv_to_mii_adv_t(phydev->advertising);
+			ethtool_adv_to_mii_adv_t(phydev->advertising);
 		remote_advertisement =
-			linkmode_adv_to_mii_adv_t(phydev->lp_advertising);
+			ethtool_adv_to_mii_adv_t(phydev->lp_advertising);
 
 		lan743x_phy_update_flowcontrol(adapter,
 					       ksettings.base.duplex,
@@ -1019,7 +1019,7 @@ static int lan743x_phy_open(struct lan743x_adapter *adapter)
 	struct device_node *phynode;
 	struct net_device *netdev;
 	int ret = -EIO;
-
+        u32 mii_adv;
 	netdev = adapter->netdev;
 	phynode = of_node_get(adapter->pdev->dev.of_node);
 
@@ -1058,8 +1058,8 @@ static int lan743x_phy_open(struct lan743x_adapter *adapter)
 
 	/* MAC doesn't support 1000T Half */
 	// phy_remove_link_mode(phydev, ETHTOOL_LINK_MODE_1000baseT_Half_BIT);
-    phydev->supported &= ~SUPPORTED_1000baseT_Half;
-    
+        phydev->supported &= ~SUPPORTED_1000baseT_Half;
+
 	/* support both flow controls */
 	phy->fc_request_control = (FLOW_CTRL_RX | FLOW_CTRL_TX);
 	phydev->advertising &= ~(ADVERTISED_Pause | ADVERTISED_Asym_Pause);
