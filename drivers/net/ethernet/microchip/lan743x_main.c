@@ -1027,7 +1027,7 @@ static int lan743x_phy_open(struct lan743x_adapter *adapter)
 	adapter->phy_mode = PHY_INTERFACE_MODE_GMII;
 
 	if (phynode) {
-		of_get_phy_mode(phynode, &adapter->phy_mode);
+		of_get_phy_mode_new(phynode, &adapter->phy_mode);
 
 		if (of_phy_is_fixed_link(phynode)) {
 			ret = of_phy_register_fixed_link(phynode);

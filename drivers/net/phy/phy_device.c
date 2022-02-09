@@ -1701,6 +1701,64 @@ int genphy_loopback(struct phy_device *phydev, bool enable)
 }
 EXPORT_SYMBOL(genphy_loopback);
 
+/**
+ * phy_remove_link_mode - Remove a supported link mode
+ * @phydev: phy_device structure to remove link mode from
+ * @link_mode: Link mode to be removed
+ *
+ * Description: Some MACs don't support all link modes which the PHY
+ * does.  e.g. a 1G MAC often does not support 1000Half. Add a helper
+ * to remove a link mode.
+ */
+void phy_remove_link_mode(struct phy_device *phydev, u32 link_mode)
+{
+	linkmode_clear_bit(link_mode, phydev->supported);
+	phy_advertise_supported(phydev);
+}
+EXPORT_SYMBOL(phy_remove_link_mode);
+
+/**
+ * phy_advertise_supported - Advertise all supported modes
+ * @phydev: target phy_device struct
+ *
+ * Description: Called to advertise all supported modes, doesn't touch
+ * pause mode advertising.
+ */
+void phy_advertise_supported(struct phy_device *phydev)
+{
+	__ETHTOOL_DECLARE_LINK_MODE_MASK(new);
+
+	linkmode_copy(new, phydev->supported);
+	phy_copy_pause_bits(new, phydev->advertising);
+	linkmode_copy(phydev->advertising, new);
+}
+EXPORT_SYMBOL(phy_advertise_supported);
+
+
+/**
+ * phy_set_asym_pause - Configure Pause and Asym Pause
+ * @phydev: target phy_device struct
+ * @rx: Receiver Pause is supported
+ * @tx: Transmit Pause is supported
+ *
+ * Description: Configure advertised Pause support depending on if
+ * transmit and receiver pause is supported. If there has been a
+ * change in adverting, trigger a new autoneg. Generally called from
+ * the set_pauseparam .ndo.
+ */
+void phy_set_asym_pause(struct phy_device *phydev, bool rx, bool tx)
+{
+	__ETHTOOL_DECLARE_LINK_MODE_MASK(oldadv);
+
+	linkmode_copy(oldadv, phydev->advertising);
+	linkmode_set_pause(phydev->advertising, tx, rx);
+
+	if (!linkmode_equal(oldadv, phydev->advertising) &&
+	    phydev->autoneg)
+		phy_start_aneg(phydev);
+}
+EXPORT_SYMBOL(phy_set_asym_pause);
+
 static int __set_phy_supported(struct phy_device *phydev, u32 max_speed)
 {
 	phydev->supported &= ~(PHY_1000BT_FEATURES | PHY_100BT_FEATURES |

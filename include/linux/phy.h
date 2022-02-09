@@ -914,6 +914,10 @@ int phy_start_interrupts(struct phy_device *phydev);
 void phy_print_status(struct phy_device *phydev);
 int phy_set_max_speed(struct phy_device *phydev, u32 max_speed);
 
+void phy_remove_link_mode(struct phy_device *phydev, u32 link_mode);
+void phy_advertise_supported(struct phy_device *phydev);
+void phy_support_asym_pause(struct phy_device *phydev);
+
 int phy_register_fixup(const char *bus_id, u32 phy_uid, u32 phy_uid_mask,
 		       int (*run)(struct phy_device *));
 int phy_register_fixup_for_id(const char *bus_id,
