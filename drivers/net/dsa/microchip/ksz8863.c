@@ -2,7 +2,7 @@
 /*
  * Microchip KSZ8863 switch driver
  *
- * Copyright (C) 2019 Microchip Technology Inc.
+ * Copyright (C) 2019-2021 Microchip Technology Inc.
  *	Tristram Ha <Tristram.Ha@microchip.com>
  */
 
@@ -617,14 +617,19 @@ static void ksz8863_w_phy(struct ksz_device *dev, u16 phy, u16 reg, u16 val)
 	}
 }
 
-static enum dsa_tag_protocol ksz8863_get_tag_protocol(struct dsa_switch *ds)
+static enum dsa_tag_protocol ksz8863_get_tag_protocol(struct dsa_switch *ds,
+						      int port)
 {
 	return DSA_TAG_PROTO_KSZ;
 }
 
-static void ksz8863_get_strings(struct dsa_switch *ds, int port, uint8_t *buf)
+static void ksz8863_get_strings(struct dsa_switch *ds, int port,
+				u32 stringset, uint8_t *buf)
 {
 	int i;
+
+	if (stringset != ETH_SS_STATS)
+		return;
 
 	for (i = 0; i < TOTAL_SWITCH_COUNTER_NUM; i++) {
 		memcpy(buf + i * ETH_GSTRING_LEN, ksz8863_mib_names[i].string,
@@ -779,8 +784,7 @@ static int ksz8863_port_vlan_filtering(struct dsa_switch *ds, int port,
 }
 
 static void ksz8863_port_vlan_add(struct dsa_switch *ds, int port,
-				  const struct switchdev_obj_port_vlan *vlan,
-				  struct switchdev_trans *trans)
+				  const struct switchdev_obj_port_vlan *vlan)
 {
 	struct ksz_device *dev = ds->priv;
 	u32 data;
@@ -902,7 +906,6 @@ static int ksz8863_port_vlan_del(struct dsa_switch *ds, int port,
 	return 0;
 }
 
-#if 0
 static int ksz8863_port_mirror_add(struct dsa_switch *ds, int port,
 				   struct dsa_mall_mirror_tc_entry *mirror,
 				   bool ingress)
@@ -947,7 +950,6 @@ static void ksz8863_port_mirror_del(struct dsa_switch *ds, int port,
 		ksz_port_cfg(dev, mirror->to_local_port, P_MIRROR_CTRL,
 			     PORT_MIRROR_SNIFFER, false);
 }
-#endif
 
 static void ksz8863_phy_setup(struct ksz_device *dev, int port,
 			      struct phy_device *phy)
@@ -1145,10 +1147,8 @@ static struct dsa_switch_ops ksz8863_switch_ops = {
 	.port_mdb_prepare       = ksz_port_mdb_prepare,
 	.port_mdb_add           = ksz_port_mdb_add,
 	.port_mdb_del           = ksz_port_mdb_del,
-#if 0
 	.port_mirror_add	= ksz8863_port_mirror_add,
 	.port_mirror_del	= ksz8863_port_mirror_del,
-#endif
 };
 
 #define KSZ8863_REGS_SIZE		0x100
@@ -1163,11 +1163,11 @@ static struct bin_attribute ksz8863_registers_attr = {
 	.write	= ksz_registers_write,
 };
 
-#define KSZ_CHIP_NAME_SIZE		18
+#define KSZ_CHIP_NAME_SIZE		25
 
 static const char *ksz8863_chip_names[KSZ_CHIP_NAME_SIZE] = {
-	"Microchip KSZ8863",
-	"Microchip KSZ8873",
+	"Microchip KSZ8863 Switch",
+	"Microchip KSZ8873 Switch",
 };
 
 enum {
@@ -1180,11 +1180,15 @@ static int kszphy_config_init(struct phy_device *phydev)
 	return 0;
 }
 
+static char phy_driver_name[][KSZ_CHIP_NAME_SIZE] = {
+	"Microchip KSZ8863",
+};
+
 static struct phy_driver ksz8863_phy_driver[] = {
 {
 	.phy_id		= PHY_ID_KSZ8863_SW,
 	.phy_id_mask	= 0x00ffffff,
-	.name		= "Microchip KSZ8863",
+	.name		= phy_driver_name[0],
 	.features	= PHY_BASIC_FEATURES,
 	.flags		= PHY_HAS_INTERRUPT,
 	.config_init	= kszphy_config_init,
@@ -1224,7 +1228,7 @@ static int ksz8863_switch_detect(struct ksz_device *dev)
 		chip = KSZ8873_SW_CHIP;
 	if (chip >= 0) {
 		dev->name = ksz8863_chip_names[chip];
-		strlcpy(ksz8863_phy_driver[0].name, ksz8863_chip_names[chip],
+		strlcpy(phy_driver_name[0], ksz8863_chip_names[chip],
 			KSZ_CHIP_NAME_SIZE);
 	}
 	id2 = 0x63;
@@ -1310,6 +1314,8 @@ static int ksz8863_switch_init(struct ksz_device *dev)
 	}
 	i = phy_drivers_register(ksz8863_phy_driver,
 				 ARRAY_SIZE(ksz8863_phy_driver), THIS_MODULE);
+	if (i < 0)
+		return -ENODEV;
 
 	dev->regs_size = KSZ8863_REGS_SIZE;
 	i = sysfs_create_bin_file(&dev->dev->kobj,

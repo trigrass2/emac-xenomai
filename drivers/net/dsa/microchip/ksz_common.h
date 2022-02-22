@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0
  * Microchip switch driver common header
  *
- * Copyright (C) 2017-2019 Microchip Technology Inc.
+ * Copyright (C) 2017-2021 Microchip Technology Inc.
  */
 
 #ifndef __KSZ_COMMON_H
@@ -16,24 +16,21 @@ int ksz_phy_read16(struct dsa_switch *ds, int addr, int reg);
 int ksz_phy_write16(struct dsa_switch *ds, int addr, int reg, u16 val);
 void ksz_adjust_link(struct dsa_switch *ds, int port,
 		     struct phy_device *phydev);
-int ksz_sset_count(struct dsa_switch *ds);
+int ksz_sset_count(struct dsa_switch *ds, int port, int sset);
 void ksz_get_ethtool_stats(struct dsa_switch *ds, int port, uint64_t *buf);
 int ksz_port_bridge_join(struct dsa_switch *ds, int port,
 			 struct net_device *br);
-void ksz_port_bridge_leave(struct dsa_switch *ds, int port);
+void ksz_port_bridge_leave(struct dsa_switch *ds, int port,
+			   struct net_device *br);
 void ksz_port_fast_age(struct dsa_switch *ds, int port);
 int ksz_port_vlan_prepare(struct dsa_switch *ds, int port,
-			  const struct switchdev_obj_port_vlan *vlan,
-			  struct switchdev_trans *trans);
+			  const struct switchdev_obj_port_vlan *vlan);
 int ksz_port_fdb_dump(struct dsa_switch *ds, int port,
-		      struct switchdev_obj_port_fdb *fdb,
-		      int (*cb)(struct switchdev_obj *obj));
+		      dsa_fdb_dump_cb_t *cb, void *data);
 int ksz_port_mdb_prepare(struct dsa_switch *ds, int port,
-			 const struct switchdev_obj_port_mdb *mdb,
-			 struct switchdev_trans *trans);
+			 const struct switchdev_obj_port_mdb *mdb);
 void ksz_port_mdb_add(struct dsa_switch *ds, int port,
-		      const struct switchdev_obj_port_mdb *mdb,
-		      struct switchdev_trans *trans);
+		      const struct switchdev_obj_port_mdb *mdb);
 int ksz_port_mdb_del(struct dsa_switch *ds, int port,
 		     const struct switchdev_obj_port_mdb *mdb);
 int ksz_enable_port(struct dsa_switch *ds, int port, struct phy_device *phy);
@@ -195,4 +192,16 @@ static inline void ksz_port_cfg(struct ksz_device *dev, int port, int offset,
 			   set ? bits : 0);
 }
 
+static inline void ksz_cfg16(struct ksz_device *dev, u32 addr, u16 bits,
+			     bool set)
+{
+	regmap_update_bits(dev->regmap[1], addr, bits, set ? bits : 0);
+}
+
+static inline void ksz_port_cfg16(struct ksz_device *dev, int port, int offset,
+				  u16 bits, bool set)
+{
+	regmap_update_bits(dev->regmap[1], PORT_CTRL_ADDR(port, offset), bits,
+			   set ? bits : 0);
+}
 #endif

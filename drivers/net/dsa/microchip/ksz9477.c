@@ -654,9 +654,9 @@ static void sgmii_check_work(struct work_struct *work)
 	}
 }
 
-static void sgmii_monitor(unsigned long ptr)
+static void sgmii_monitor(struct timer_list *t)
 {
-	struct ksz_device *dev = (struct ksz_device *)ptr;
+	struct ksz_device *dev = from_timer(dev, t, sgmii_timer);
 
 	mod_timer(&dev->sgmii_timer, jiffies + msecs_to_jiffies(1000));
 	schedule_work(&dev->sgmii_check);
@@ -725,7 +725,8 @@ static void ksz9477_port_init_cnt(struct ksz_device *dev, int port)
 	memset(mib->counters, 0, dev->mib_cnt * sizeof(u64));
 }
 
-static enum dsa_tag_protocol ksz9477_get_tag_protocol(struct dsa_switch *ds)
+static enum dsa_tag_protocol ksz9477_get_tag_protocol(struct dsa_switch *ds,
+						      int port)
 {
 	return DSA_TAG_PROTO_KSZ;
 }
@@ -829,9 +830,13 @@ static int ksz9477_phy_write16(struct dsa_switch *ds, int addr, int reg,
 	return 0;
 }
 
-static void ksz9477_get_strings(struct dsa_switch *ds, int port, uint8_t *buf)
+static void ksz9477_get_strings(struct dsa_switch *ds, int port,
+				u32 stringset, uint8_t *buf)
 {
 	int i;
+
+	if (stringset != ETH_SS_STATS)
+		return;
 
 	for (i = 0; i < TOTAL_SWITCH_COUNTER_NUM; i++) {
 		memcpy(buf + i * ETH_GSTRING_LEN, ksz9477_mib_names[i].string,
@@ -1001,8 +1006,7 @@ static int ksz9477_port_vlan_filtering(struct dsa_switch *ds, int port,
 }
 
 static void ksz9477_port_vlan_add(struct dsa_switch *ds, int port,
-				  const struct switchdev_obj_port_vlan *vlan,
-				  struct switchdev_trans *trans)
+				  const struct switchdev_obj_port_vlan *vlan)
 {
 	struct ksz_device *dev = ds->priv;
 	u32 vlan_table[3];
@@ -1107,16 +1111,13 @@ static int ksz9477_port_vlan_del(struct dsa_switch *ds, int port,
 	return 0;
 }
 
-static void ksz9477_port_fdb_add(struct dsa_switch *ds, int port,
-				 const struct switchdev_obj_port_fdb *fdb,
-				 struct switchdev_trans *trans)
+static int ksz9477_port_fdb_add(struct dsa_switch *ds, int port,
+				const unsigned char *addr, u16 vid)
 {
 	struct ksz_device *dev = ds->priv;
 	u32 alu_table[4];
 	u32 data;
 	int ret = 0;
-	u16 vid = fdb->vid;
-	const u8 *addr = fdb->addr;
 	u16 fid = ksz9477_get_fid(vid);
 
 	mutex_lock(&dev->alu_mutex);
@@ -1170,18 +1171,17 @@ static void ksz9477_port_fdb_add(struct dsa_switch *ds, int port,
 
 exit:
 	mutex_unlock(&dev->alu_mutex);
+	return ret;
 }
 
 static int ksz9477_port_fdb_del(struct dsa_switch *ds, int port,
-				const struct switchdev_obj_port_fdb *fdb)
+				const unsigned char *addr, u16 vid)
 {
 	struct ksz_device *dev = ds->priv;
 	u32 alu_table[4];
 	u32 data;
 	u32 mask = 0;
 	int ret = 0;
-	u16 vid = fdb->vid;
-	const u8 *addr = fdb->addr;
 	u16 fid = ksz9477_get_fid(vid);
 
 	mutex_lock(&dev->alu_mutex);
@@ -1274,8 +1274,7 @@ static void ksz9477_convert_alu(struct alu_struct *alu, u32 *alu_table)
 }
 
 static int ksz9477_port_fdb_dump(struct dsa_switch *ds, int port,
-				 struct switchdev_obj_port_fdb *fdb,
-				 int (*cb)(struct switchdev_obj *obj))
+				 dsa_fdb_dump_cb_t *cb, void *data)
 {
 	struct ksz_device *dev = ds->priv;
 	int ret = 0;
@@ -1324,14 +1323,7 @@ static int ksz9477_port_fdb_dump(struct dsa_switch *ds, int port,
 		ksz9477_convert_alu(&alu, alu_table);
 
 		if (alu.port_forward & BIT(port)) {
-			fdb->vid = alu.fid;
-			if (alu.is_static)
-				fdb->ndm_state = NUD_NOARP;
-			else
-				fdb->ndm_state = NUD_REACHABLE;
-			ether_addr_copy(fdb->addr, alu.mac);
-
-			ret = cb(&fdb->obj);
+			ret = cb(alu.mac, alu.fid, alu.is_static, data);
 			if (ret)
 				goto exit;
 		}
@@ -1353,16 +1345,10 @@ exit:
 }
 
 static void ksz9477_port_mdb_add(struct dsa_switch *ds, int port,
-				 const struct switchdev_obj_port_mdb *mdb,
-				 struct switchdev_trans *trans)
+				 const struct switchdev_obj_port_mdb *mdb)
 {
 #if 1
-	struct switchdev_obj_port_fdb fdb;
-
-	ether_addr_copy(fdb.addr, mdb->addr);
-	fdb.vid = mdb->vid;
-	memcpy(fdb.addr, mdb->addr, ETH_ALEN);
-	ksz9477_port_fdb_add(ds, port, &fdb, trans);
+	ksz9477_port_fdb_add(ds, port, mdb->addr, mdb->vid);
 #else
 	struct ksz_device *dev = ds->priv;
 	u32 static_table[4];
@@ -1448,12 +1434,7 @@ static int ksz9477_port_mdb_del(struct dsa_switch *ds, int port,
 				const struct switchdev_obj_port_mdb *mdb)
 {
 #if 1
-	struct switchdev_obj_port_fdb fdb;
-
-	ether_addr_copy(fdb.addr, mdb->addr);
-	fdb.vid = mdb->vid;
-	memcpy(fdb.addr, mdb->addr, ETH_ALEN);
-	return ksz9477_port_fdb_del(ds, port, &fdb);
+	return ksz9477_port_fdb_del(ds, port, mdb->addr, mdb->vid);
 #else
 	struct ksz_device *dev = ds->priv;
 	u32 static_table[4];
@@ -1533,7 +1514,6 @@ exit:
 #endif
 }
 
-#if 0
 static int ksz9477_port_mirror_add(struct dsa_switch *ds, int port,
 				   struct dsa_mall_mirror_tc_entry *mirror,
 				   bool ingress)
@@ -1573,7 +1553,6 @@ static void ksz9477_port_mirror_del(struct dsa_switch *ds, int port,
 		ksz_port_cfg(dev, mirror->to_local_port, P_MIRROR_CTRL,
 			     PORT_MIRROR_SNIFFER, false);
 }
-#endif
 
 static void ksz9477_phy_setup(struct ksz_device *dev, int port,
 			      struct phy_device *phy)
@@ -1712,9 +1691,20 @@ static phy_interface_t ksz9477_get_interface(struct ksz_device *dev, int port)
 		interface = PHY_INTERFACE_MODE_RMII;
 		break;
 	default:
-		interface = PHY_INTERFACE_MODE_RGMII_RXID;
+		// interface = PHY_INTERFACE_MODE_RGMII;
+        interface = PHY_INTERFACE_MODE_RGMII_RXID;
+        /*    
+		if (data8 & PORT_RGMII_ID_EG_ENABLE)
+			interface = PHY_INTERFACE_MODE_RGMII_TXID;
+		if (data8 & PORT_RGMII_ID_IG_ENABLE) {
+			if (data8 & PORT_RGMII_ID_EG_ENABLE)
+				interface = PHY_INTERFACE_MODE_RGMII_ID;
+		}
+		*/
 		break;
 	}
+    // JIC JMILLS
+    interface = PHY_INTERFACE_MODE_RGMII_RXID;
 	return interface;
 }
 
@@ -1785,13 +1775,14 @@ static void ksz9477_port_setup(struct ksz_device *dev, int port, bool cpu_port)
 			ksz9477_set_gbit(dev, true, &data8);
 			data8 &= ~PORT_RGMII_ID_IG_ENABLE;
 			data8 &= ~PORT_RGMII_ID_EG_ENABLE;
-			if (dev->interface == PHY_INTERFACE_MODE_RGMII_ID ||
+            data8 |= PORT_RGMII_ID_IG_ENABLE;
+			/*if (dev->interface == PHY_INTERFACE_MODE_RGMII_ID ||
 			    dev->interface == PHY_INTERFACE_MODE_RGMII_RXID)
-				data8 |= PORT_RGMII_ID_IG_ENABLE;
 			if (dev->interface == PHY_INTERFACE_MODE_RGMII_ID ||
 			    dev->interface == PHY_INTERFACE_MODE_RGMII_TXID)
 				data8 |= PORT_RGMII_ID_EG_ENABLE;
-			p->phydev.speed = SPEED_1000;
+			*/
+            p->phydev.speed = SPEED_1000;
 			break;
 		}
 		ksz_pwrite8(dev, port, REG_PORT_XMII_CTRL_1, data8);
@@ -1923,7 +1914,7 @@ static void ksz9477_config_cpu_port(struct dsa_switch *ds)
 		return;
 
 	INIT_WORK(&dev->sgmii_check, sgmii_check_work);
-	setup_timer(&dev->sgmii_timer, sgmii_monitor, (unsigned long)dev);
+	timer_setup(&dev->sgmii_timer, sgmii_monitor, 0);
 	dev->sgmii_timer.expires = jiffies + msecs_to_jiffies(2000);
 	add_timer(&dev->sgmii_timer);
 }
@@ -2049,10 +2040,8 @@ static struct dsa_switch_ops ksz9477_switch_ops = {
 	.port_mdb_prepare       = ksz_port_mdb_prepare,
 	.port_mdb_add           = ksz9477_port_mdb_add,
 	.port_mdb_del           = ksz9477_port_mdb_del,
-#if 0
 	.port_mirror_add	= ksz9477_port_mirror_add,
 	.port_mirror_del	= ksz9477_port_mirror_del,
-#endif
 };
 
 #define KSZ9477_REGS_SIZE		0x8000
@@ -2067,18 +2056,18 @@ static struct bin_attribute ksz9477_registers_attr = {
 	.write	= ksz_registers_write,
 };
 
-#define KSZ_CHIP_NAME_SIZE		18
+#define KSZ_CHIP_NAME_SIZE		25
 
 static const char *ksz9477_chip_names[KSZ_CHIP_NAME_SIZE] = {
-	"Microchip KSZ9897",
-	"Microchip KSZ9896",
-	"Microchip KSZ9567",
-	"Microchip KSZ8567",
-	"Microchip KSZ8565",
-	"Microchip KSZ9477",
-	"Microchip KSZ9893",
-	"Microchip KSZ9563",
-	"Microchip KSZ8563",
+	"Microchip KSZ9897 Switch",
+	"Microchip KSZ9896 Switch",
+	"Microchip KSZ9567 Switch",
+	"Microchip KSZ8567 Switch",
+	"Microchip KSZ8565 Switch",
+	"Microchip KSZ9477 Switch",
+	"Microchip KSZ9893 Switch",
+	"Microchip KSZ9563 Switch",
+	"Microchip KSZ8563 Switch",
 };
 
 enum {
@@ -2098,11 +2087,16 @@ static int kszphy_config_init(struct phy_device *phydev)
 	return 0;
 }
 
+static char phy_driver_name[][KSZ_CHIP_NAME_SIZE] = {
+	"Microchip KSZ989X",
+	"Microchip KSZ889X",
+};
+
 static struct phy_driver ksz9477_phy_driver[] = {
 {
 	.phy_id		= PHY_ID_KSZ989X_SW,
 	.phy_id_mask	= 0x00ffffff,
-	.name		= "Microchip KSZ989X",
+	.name		= phy_driver_name[0],
 	.features	= PHY_GBIT_FEATURES,
 	.flags		= PHY_HAS_INTERRUPT,
 	.config_init	= kszphy_config_init,
@@ -2114,7 +2108,7 @@ static struct phy_driver ksz9477_phy_driver[] = {
 }, {
 	.phy_id		= PHY_ID_KSZ889X_SW,
 	.phy_id_mask	= 0x00ffffff,
-	.name		= "Microchip KSZ889X",
+	.name		= phy_driver_name[1],
 	.features	= PHY_BASIC_FEATURES,
 	.flags		= PHY_HAS_INTERRUPT,
 	.config_init	= kszphy_config_init,
@@ -2225,7 +2219,7 @@ static int ksz9477_switch_detect(struct ksz_device *dev)
 			id = 0;
 		else
 			id = 1;
-		strlcpy(ksz9477_phy_driver[id].name, ksz9477_chip_names[chip],
+		strlcpy(phy_driver_name[id], ksz9477_chip_names[chip],
 			KSZ_CHIP_NAME_SIZE);
 	}
 	if (dev->dev->of_node) {

@@ -21,10 +21,12 @@ void ksz_update_port_member(struct ksz_device *dev, int port)
 	struct ksz_port *p;
 	int i;
 
-	for (i = 0; i < dev->port_cnt; i++) {
+	for (i = 0; i < dev->mib_port_cnt; i++) {
 		if (i == port || i == dev->cpu_port)
 			continue;
 		p = &dev->ports[i];
+		if (!p->on)
+			continue;
 		if (!(dev->member & (1 << i)))
 			continue;
 
@@ -85,9 +87,9 @@ static void ksz_mib_read_work(struct work_struct *work)
 	}
 }
 
-static void mib_monitor(unsigned long ptr)
+static void mib_monitor(struct timer_list *t)
 {
-	struct ksz_device *dev = (struct ksz_device *)ptr;
+	struct ksz_device *dev = from_timer(dev, t, mib_read_timer);
 
 	mod_timer(&dev->mib_read_timer, jiffies + dev->mib_read_interval);
 	schedule_work(&dev->mib_read);
@@ -101,7 +103,7 @@ void ksz_init_mib_timer(struct ksz_device *dev)
 	dev->mib_read_interval = msecs_to_jiffies(30000);
 
 	INIT_WORK(&dev->mib_read, ksz_mib_read_work);
-	setup_timer(&dev->mib_read_timer, mib_monitor, (unsigned long)dev);
+	timer_setup(&dev->mib_read_timer, mib_monitor, 0);
 
 	for (i = 0; i < dev->mib_port_cnt; i++)
 		dev->dev_ops->port_init_cnt(dev, i);
@@ -156,9 +158,12 @@ void ksz_adjust_link(struct dsa_switch *ds, int port,
 }
 EXPORT_SYMBOL_GPL(ksz_adjust_link);
 
-int ksz_sset_count(struct dsa_switch *ds)
+int ksz_sset_count(struct dsa_switch *ds, int port, int sset)
 {
 	struct ksz_device *dev = ds->priv;
+
+	if (sset != ETH_SS_STATS)
+		return 0;
 
 	return dev->mib_cnt;
 }
@@ -192,7 +197,8 @@ int ksz_port_bridge_join(struct dsa_switch *ds, int port,
 }
 EXPORT_SYMBOL_GPL(ksz_port_bridge_join);
 
-void ksz_port_bridge_leave(struct dsa_switch *ds, int port)
+void ksz_port_bridge_leave(struct dsa_switch *ds, int port,
+			   struct net_device *br)
 {
 	struct ksz_device *dev = ds->priv;
 
@@ -214,8 +220,7 @@ void ksz_port_fast_age(struct dsa_switch *ds, int port)
 EXPORT_SYMBOL_GPL(ksz_port_fast_age);
 
 int ksz_port_vlan_prepare(struct dsa_switch *ds, int port,
-			  const struct switchdev_obj_port_vlan *vlan,
-			  struct switchdev_trans *trans)
+			  const struct switchdev_obj_port_vlan *vlan)
 {
 	/* nothing needed */
 
@@ -224,8 +229,7 @@ int ksz_port_vlan_prepare(struct dsa_switch *ds, int port,
 EXPORT_SYMBOL_GPL(ksz_port_vlan_prepare);
 
 int ksz_port_fdb_dump(struct dsa_switch *ds, int port,
-		      struct switchdev_obj_port_fdb *fdb,
-		      int (*cb)(struct switchdev_obj *obj))
+		      dsa_fdb_dump_cb_t *cb, void *data)
 {
 	struct ksz_device *dev = ds->priv;
 	int ret = 0;
@@ -242,11 +246,7 @@ int ksz_port_fdb_dump(struct dsa_switch *ds, int port,
 						    &member, &timestamp,
 						    &entries);
 		if (!ret && (member & BIT(port))) {
-			fdb->vid = fid;
-			fdb->ndm_state = NUD_REACHABLE;
-			ether_addr_copy(fdb->addr, alu.mac);
-
-			ret = cb(&fdb->obj);
+			ret = cb(alu.mac, alu.fid, alu.is_static, data);
 			if (ret)
 				break;
 		}
@@ -260,8 +260,7 @@ int ksz_port_fdb_dump(struct dsa_switch *ds, int port,
 EXPORT_SYMBOL_GPL(ksz_port_fdb_dump);
 
 int ksz_port_mdb_prepare(struct dsa_switch *ds, int port,
-			 const struct switchdev_obj_port_mdb *mdb,
-			 struct switchdev_trans *trans)
+			 const struct switchdev_obj_port_mdb *mdb)
 {
 	/* nothing to do */
 	return 0;
@@ -269,8 +268,7 @@ int ksz_port_mdb_prepare(struct dsa_switch *ds, int port,
 EXPORT_SYMBOL_GPL(ksz_port_mdb_prepare);
 
 void ksz_port_mdb_add(struct dsa_switch *ds, int port,
-		      const struct switchdev_obj_port_mdb *mdb,
-		      struct switchdev_trans *trans)
+		      const struct switchdev_obj_port_mdb *mdb)
 {
 	struct ksz_device *dev = ds->priv;
 	struct alu_struct alu;
@@ -447,7 +445,7 @@ struct ksz_device *ksz_switch_alloc(struct device *base)
 	struct dsa_switch *ds;
 	struct ksz_device *swdev;
 
-	ds = devm_kzalloc(base, sizeof(*ds), GFP_KERNEL);
+	ds = dsa_switch_alloc(base, DSA_MAX_PORTS);
 	if (!ds)
 		return NULL;
 
@@ -495,7 +493,8 @@ int ksz_switch_register(struct ksz_device *dev,
 			dev->interface = ret;
 	}
 
-	ret = dsa_register_switch(dev->ds, dev->ds->dev->of_node);
+	dev->ds->num_ports = dev->mib_port_cnt;
+	ret = dsa_register_switch(dev->ds);
 	if (ret) {
 		dev->dev_ops->exit(dev);
 		return ret;
