@@ -1004,7 +1004,7 @@ static int ksz9477_port_vlan_filtering(struct dsa_switch *ds, int port,
 
 static void ksz9477_port_vlan_add(struct dsa_switch *ds, int port,
 				  const struct switchdev_obj_port_vlan *vlan,
-                  const struct switchdev_trans *trans )
+                  struct switchdev_trans *trans )
 {
 	struct ksz_device *dev = ds->priv;
 	u32 vlan_table[3];
@@ -1512,7 +1512,7 @@ exit:
 	return ret;
 #endif
 }
-
+/*
 static int ksz9477_port_mirror_add(struct dsa_switch *ds, int port,
 				   struct dsa_mall_mirror_tc_entry *mirror,
 				   bool ingress)
@@ -1526,7 +1526,7 @@ static int ksz9477_port_mirror_add(struct dsa_switch *ds, int port,
 
 	ksz_port_cfg(dev, port, P_MIRROR_CTRL, PORT_MIRROR_SNIFFER, false);
 
-	/* configure mirror port */
+	/// configure mirror port 
 	ksz_port_cfg(dev, mirror->to_local_port, P_MIRROR_CTRL,
 		     PORT_MIRROR_SNIFFER, true);
 
@@ -1534,7 +1534,9 @@ static int ksz9477_port_mirror_add(struct dsa_switch *ds, int port,
 
 	return 0;
 }
-
+*/
+    
+/*
 static void ksz9477_port_mirror_del(struct dsa_switch *ds, int port,
 				    struct dsa_mall_mirror_tc_entry *mirror)
 {
@@ -1552,6 +1554,7 @@ static void ksz9477_port_mirror_del(struct dsa_switch *ds, int port,
 		ksz_port_cfg(dev, mirror->to_local_port, P_MIRROR_CTRL,
 			     PORT_MIRROR_SNIFFER, false);
 }
+*/
 
 static void ksz9477_phy_setup(struct ksz_device *dev, int port,
 			      struct phy_device *phy)

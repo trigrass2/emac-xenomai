@@ -16,7 +16,7 @@ int ksz_phy_read16(struct dsa_switch *ds, int addr, int reg);
 int ksz_phy_write16(struct dsa_switch *ds, int addr, int reg, u16 val);
 void ksz_adjust_link(struct dsa_switch *ds, int port,
 		     struct phy_device *phydev);
-int ksz_sset_count(struct dsa_switch *ds, int port, int sset);
+int ksz_sset_count(struct dsa_switch *ds);
 void ksz_get_ethtool_stats(struct dsa_switch *ds, int port, uint64_t *buf);
 int ksz_port_bridge_join(struct dsa_switch *ds, int port,
 			 struct net_device *br);
@@ -24,11 +24,12 @@ void ksz_port_bridge_leave(struct dsa_switch *ds, int port,
 			   struct net_device *br);
 void ksz_port_fast_age(struct dsa_switch *ds, int port);
 int ksz_port_vlan_prepare(struct dsa_switch *ds, int port,
-			  const struct switchdev_obj_port_vlan *vlan);
+			  const struct switchdev_obj_port_vlan *vlan, 
+              struct switchdev_trans *trans);
 int ksz_port_fdb_dump(struct dsa_switch *ds, int port,
 		      dsa_fdb_dump_cb_t *cb, void *data);
 int ksz_port_mdb_prepare(struct dsa_switch *ds, int port,
-			 const struct switchdev_obj_port_mdb *mdb);
+			 const struct switchdev_obj_port_mdb *mdb, struct switchdev_trans *trans);
 void ksz_port_mdb_add(struct dsa_switch *ds, int port,
 		      const struct switchdev_obj_port_mdb *mdb);
 int ksz_port_mdb_del(struct dsa_switch *ds, int port,
