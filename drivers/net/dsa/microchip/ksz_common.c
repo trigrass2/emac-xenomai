@@ -158,13 +158,14 @@ void ksz_adjust_link(struct dsa_switch *ds, int port,
 }
 EXPORT_SYMBOL_GPL(ksz_adjust_link);
 
-int ksz_sset_count(struct dsa_switch *ds, int port, int sset)
+int ksz_sset_count(struct dsa_switch *ds /*, int port, int sset*/)
 {
 	struct ksz_device *dev = ds->priv;
 
+    /*
 	if (sset != ETH_SS_STATS)
 		return 0;
-
+    */
 	return dev->mib_cnt;
 }
 EXPORT_SYMBOL_GPL(ksz_sset_count);
@@ -219,8 +220,9 @@ void ksz_port_fast_age(struct dsa_switch *ds, int port)
 }
 EXPORT_SYMBOL_GPL(ksz_port_fast_age);
 
-int ksz_port_vlan_prepare(struct dsa_switch *ds, int port,
-			  const struct switchdev_obj_port_vlan *vlan)
+static int ksz_port_vlan_prepare(struct dsa_switch *ds, int port,
+				 const struct switchdev_obj_port_vlan *vlan,
+				 struct switchdev_trans *trans)
 {
 	/* nothing needed */
 
@@ -260,7 +262,8 @@ int ksz_port_fdb_dump(struct dsa_switch *ds, int port,
 EXPORT_SYMBOL_GPL(ksz_port_fdb_dump);
 
 int ksz_port_mdb_prepare(struct dsa_switch *ds, int port,
-			 const struct switchdev_obj_port_mdb *mdb)
+			 const struct switchdev_obj_port_mdb *mdb,
+             struct switchdev_trans *trans)
 {
 	/* nothing to do */
 	return 0;

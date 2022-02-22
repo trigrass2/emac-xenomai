@@ -727,8 +727,7 @@ static void ksz9477_port_init_cnt(struct ksz_device *dev, int port)
 	memset(mib->counters, 0, dev->mib_cnt * sizeof(u64));
 }
 
-static enum dsa_tag_protocol ksz9477_get_tag_protocol(struct dsa_switch *ds,
-						      int port)
+static enum dsa_tag_protocol ksz9477_get_tag_protocol(struct dsa_switch *ds)
 {
 	return DSA_TAG_PROTO_KSZ;
 }
@@ -833,12 +832,9 @@ static int ksz9477_phy_write16(struct dsa_switch *ds, int addr, int reg,
 }
 
 static void ksz9477_get_strings(struct dsa_switch *ds, int port,
-				u32 stringset, uint8_t *buf)
+				uint8_t *buf)
 {
 	int i;
-
-	if (stringset != ETH_SS_STATS)
-		return;
 
 	for (i = 0; i < TOTAL_SWITCH_COUNTER_NUM; i++) {
 		memcpy(buf + i * ETH_GSTRING_LEN, ksz9477_mib_names[i].string,
@@ -1008,7 +1004,8 @@ static int ksz9477_port_vlan_filtering(struct dsa_switch *ds, int port,
 }
 
 static void ksz9477_port_vlan_add(struct dsa_switch *ds, int port,
-				  const struct switchdev_obj_port_vlan *vlan)
+				  const struct switchdev_obj_port_vlan *vlan,
+                  const struct switchdev_trans *trans )
 {
 	struct ksz_device *dev = ds->priv;
 	u32 vlan_table[3];
@@ -1347,7 +1344,8 @@ exit:
 }
 
 static void ksz9477_port_mdb_add(struct dsa_switch *ds, int port,
-				 const struct switchdev_obj_port_mdb *mdb)
+				 const struct switchdev_obj_port_mdb *mdb,
+                 struct switchdev_trans *trans)
 {
 #if 1
 	ksz9477_port_fdb_add(ds, port, mdb->addr, mdb->vid);
@@ -2042,8 +2040,11 @@ static struct dsa_switch_ops ksz9477_switch_ops = {
 	.port_mdb_prepare       = ksz_port_mdb_prepare,
 	.port_mdb_add           = ksz9477_port_mdb_add,
 	.port_mdb_del           = ksz9477_port_mdb_del,
+#if 0 
 	.port_mirror_add	= ksz9477_port_mirror_add,
 	.port_mirror_del	= ksz9477_port_mirror_del,
+#endif
+    
 };
 
 #define KSZ9477_REGS_SIZE		0x8000
