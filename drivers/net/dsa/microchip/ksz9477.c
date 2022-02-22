@@ -15,7 +15,6 @@
 #include <net/dsa.h>
 #include <net/switchdev.h>
 
-
 #include "ksz_priv.h"
 #include "ksz9477_reg.h"
 #include "ksz_common.h"
@@ -951,6 +950,13 @@ static void ksz9477_flush_dyn_mac_table(struct ksz_device *dev, int port)
 	}
 }
 
+
+
+static int ksz9477_port_vlan_prepare(struct dsa_switch *ds, int port, const struct switchdev_obj_port_vlan *vlan, struct switchdev_trans *trans)
+{
+	return 0;
+}
+
 static int ksz9477_port_vlan_filtering(struct dsa_switch *ds, int port,
 				       bool flag)
 {
@@ -1526,7 +1532,7 @@ static int ksz9477_port_mirror_add(struct dsa_switch *ds, int port,
 
 	ksz_port_cfg(dev, port, P_MIRROR_CTRL, PORT_MIRROR_SNIFFER, false);
 
-	/// configure mirror port 
+	// configure mirror port
 	ksz_port_cfg(dev, mirror->to_local_port, P_MIRROR_CTRL,
 		     PORT_MIRROR_SNIFFER, true);
 
@@ -1535,7 +1541,7 @@ static int ksz9477_port_mirror_add(struct dsa_switch *ds, int port,
 	return 0;
 }
 */
-    
+
 /*
 static void ksz9477_port_mirror_del(struct dsa_switch *ds, int port,
 				    struct dsa_mall_mirror_tc_entry *mirror)
@@ -1694,8 +1700,8 @@ static phy_interface_t ksz9477_get_interface(struct ksz_device *dev, int port)
 		break;
 	default:
 		// interface = PHY_INTERFACE_MODE_RGMII;
-        interface = PHY_INTERFACE_MODE_RGMII_RXID;
-        /*    
+                interface = PHY_INTERFACE_MODE_RGMII_RXID;
+                /*
 		if (data8 & PORT_RGMII_ID_EG_ENABLE)
 			interface = PHY_INTERFACE_MODE_RGMII_TXID;
 		if (data8 & PORT_RGMII_ID_IG_ENABLE) {
@@ -1705,8 +1711,8 @@ static phy_interface_t ksz9477_get_interface(struct ksz_device *dev, int port)
 		*/
 		break;
 	}
-    // JIC JMILLS
-    interface = PHY_INTERFACE_MODE_RGMII_RXID;
+        // JIC JMILLS
+        interface = PHY_INTERFACE_MODE_RGMII_RXID;
 	return interface;
 }
 
@@ -1777,14 +1783,15 @@ static void ksz9477_port_setup(struct ksz_device *dev, int port, bool cpu_port)
 			ksz9477_set_gbit(dev, true, &data8);
 			data8 &= ~PORT_RGMII_ID_IG_ENABLE;
 			data8 &= ~PORT_RGMII_ID_EG_ENABLE;
-            data8 |= PORT_RGMII_ID_IG_ENABLE;
+
+			data8 |= PORT_RGMII_ID_IG_ENABLE;
 			/*if (dev->interface == PHY_INTERFACE_MODE_RGMII_ID ||
 			    dev->interface == PHY_INTERFACE_MODE_RGMII_RXID)
 			if (dev->interface == PHY_INTERFACE_MODE_RGMII_ID ||
 			    dev->interface == PHY_INTERFACE_MODE_RGMII_TXID)
 				data8 |= PORT_RGMII_ID_EG_ENABLE;
 			*/
-            p->phydev.speed = SPEED_1000;
+            		p->phydev.speed = SPEED_1000;
 			break;
 		}
 		ksz_pwrite8(dev, port, REG_PORT_XMII_CTRL_1, data8);
@@ -2033,7 +2040,7 @@ static struct dsa_switch_ops ksz9477_switch_ops = {
 	.port_stp_state_set	= ksz9477_port_stp_state_set,
 	.port_fast_age		= ksz_port_fast_age,
 	.port_vlan_filtering	= ksz9477_port_vlan_filtering,
-	.port_vlan_prepare	= ksz_port_vlan_prepare,
+	.port_vlan_prepare	= ksz9477_port_vlan_prepare,
 	.port_vlan_add		= ksz9477_port_vlan_add,
 	.port_vlan_del		= ksz9477_port_vlan_del,
 	.port_fdb_dump		= ksz9477_port_fdb_dump,
@@ -2042,11 +2049,6 @@ static struct dsa_switch_ops ksz9477_switch_ops = {
 	.port_mdb_prepare       = ksz_port_mdb_prepare,
 	.port_mdb_add           = ksz9477_port_mdb_add,
 	.port_mdb_del           = ksz9477_port_mdb_del,
-/* 
-	.port_mirror_add	= ksz9477_port_mirror_add,
-	.port_mirror_del	= ksz9477_port_mirror_del,
-*/
-    
 };
 
 #define KSZ9477_REGS_SIZE		0x8000
