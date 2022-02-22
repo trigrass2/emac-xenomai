@@ -8,11 +8,13 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/iopoll.h>
+#include <linux/interrupt.h>
 #include <linux/platform_data/microchip-ksz.h>
 #include <linux/phy.h>
 #include <linux/if_bridge.h>
 #include <net/dsa.h>
 #include <net/switchdev.h>
+
 
 #include "ksz_priv.h"
 #include "ksz9477_reg.h"
