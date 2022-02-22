@@ -831,8 +831,7 @@ static int ksz9477_phy_write16(struct dsa_switch *ds, int addr, int reg,
 	return 0;
 }
 
-static void ksz9477_get_strings(struct dsa_switch *ds, int port,
-				uint8_t *buf)
+static void ksz9477_get_strings(struct dsa_switch *ds, int port, uint8_t *buf)
 {
 	int i;
 
@@ -2040,10 +2039,10 @@ static struct dsa_switch_ops ksz9477_switch_ops = {
 	.port_mdb_prepare       = ksz_port_mdb_prepare,
 	.port_mdb_add           = ksz9477_port_mdb_add,
 	.port_mdb_del           = ksz9477_port_mdb_del,
-#if 0 
+/* 
 	.port_mirror_add	= ksz9477_port_mirror_add,
 	.port_mirror_del	= ksz9477_port_mirror_del,
-#endif
+*/
     
 };
 

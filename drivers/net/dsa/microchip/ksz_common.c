@@ -158,15 +158,11 @@ void ksz_adjust_link(struct dsa_switch *ds, int port,
 }
 EXPORT_SYMBOL_GPL(ksz_adjust_link);
 
-int ksz_sset_count(struct dsa_switch *ds /*, int port, int sset*/)
+int ksz_sset_count(struct dsa_switch *ds)
 {
 	struct ksz_device *dev = ds->priv;
 
-    /*
-	if (sset != ETH_SS_STATS)
-		return 0;
-    */
-	return dev->mib_cnt;
+    return dev->mib_cnt;
 }
 EXPORT_SYMBOL_GPL(ksz_sset_count);
 
@@ -262,8 +258,7 @@ int ksz_port_fdb_dump(struct dsa_switch *ds, int port,
 EXPORT_SYMBOL_GPL(ksz_port_fdb_dump);
 
 int ksz_port_mdb_prepare(struct dsa_switch *ds, int port,
-			 const struct switchdev_obj_port_mdb *mdb,
-             struct switchdev_trans *trans)
+			 const struct switchdev_obj_port_mdb *mdb, struct switchdev_trans *trans)
 {
 	/* nothing to do */
 	return 0;
