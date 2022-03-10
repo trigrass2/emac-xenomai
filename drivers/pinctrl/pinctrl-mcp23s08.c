@@ -65,13 +65,13 @@ struct mcp23s08_ops {
 
 struct mcp23s08 {
 	u8			addr;
-	bool			irq_active_high;
+	bool		irq_active_high;
 
 	u16			cache[11];
 	u16			irq_rise;
 	u16			irq_fall;
 	int			irq;
-	bool			irq_controller;
+	bool		irq_controller;
 	/* lock protects the cached values */
 	struct mutex		lock;
 	struct mutex		irq_lock;
@@ -446,7 +446,7 @@ static int mcp23s08_irq_reqres(struct irq_data *data)
 	struct mcp23s08 *mcp = irq_data_get_irq_chip_data(data);
 
 	if (gpiochip_lock_as_irq(&mcp->chip, data->hwirq)) {
-		dev_err(mcp->chip.dev,
+		dev_err(mcp->chip.gpiodev,
 			"unable to lock HW IRQ %lu for IRQ usage\n",
 			data->hwirq);
 		return -EINVAL;
@@ -642,7 +642,7 @@ static int mcp23s08_probe_one(struct mcp23s08 *mcp, struct device *dev,
 
 	mcp->chip.base = pdata->base;
 	mcp->chip.can_sleep = true;
-	mcp->chip.dev = dev;
+	mcp->chip.gpiodev = dev;
 	mcp->chip.owner = THIS_MODULE;
 
 	/* verify MCP_IOCON.SEQOP = 0, so sequential reads work,
@@ -656,7 +656,7 @@ static int mcp23s08_probe_one(struct mcp23s08 *mcp, struct device *dev,
 	mcp->irq_controller = pdata->irq_controller;
 	if (mcp->irq && mcp->irq_controller) {
 		mcp->irq_active_high =
-			of_property_read_bool(mcp->chip.dev->of_node,
+			of_property_read_bool(mcp->chip.gpiodev->of_node,
 					      "microchip,irq-active-high");
 
 		if (type == MCP_TYPE_017)
