@@ -28,6 +28,9 @@
 
 #define MCP_MAX_DEV_PER_CS	8
 
+#define MCP23S08_LEGACY  1
+
+
 /* Registers are all 8 bits wide.
  *
  * The mcp23s17 has twice as many bits, and can be configured to work
@@ -53,6 +56,17 @@
 
 struct mcp23s08;
 
+
+#ifdef MCP23S08_LEGACY
+struct mcp23s08_ops {
+	int	(*read)(struct mcp23s08 *mcp, unsigned reg);
+	int	(*write)(struct mcp23s08 *mcp, unsigned reg, unsigned val);
+	int	(*read_regs)(struct mcp23s08 *mcp, unsigned reg,
+			     u16 *vals, unsigned n);
+};
+#endif
+
+
 struct mcp23s08 {
 	u8			addr;
 	bool			irq_active_high;
@@ -68,6 +82,10 @@ struct mcp23s08 {
 
 	struct gpio_chip	chip;
 
+#ifdef MCP23S08_LEGACY
+    const struct mcp23s08_ops	*ops;
+#endif
+    
 	struct regmap		*regmap;
 	struct device		*dev;
 
@@ -312,19 +330,68 @@ static const struct pinconf_ops mcp_pinconf_ops = {
 
 #ifdef CONFIG_SPI_MASTER
 
+#ifdef MCP23S08_LEGACY
+
+static int mcp23s08_read(struct mcp23s08 *mcp, unsigned reg)
+{
+	u8	tx[2], rx[1];
+	int	status;
+
+	tx[0] = mcp->addr | 0x01;
+	tx[1] = reg;
+	status = spi_write_then_read(mcp->data, tx, sizeof(tx), rx, sizeof(rx));
+	return (status < 0) ? status : rx[0];
+}
+
+static int mcp23s08_write(struct mcp23s08 *mcp, unsigned reg, unsigned val)
+{
+	u8	tx[3];
+
+	tx[0] = mcp->addr;
+	tx[1] = reg;
+	tx[2] = val;
+	return spi_write_then_read(mcp->data, tx, sizeof(tx), NULL, 0);
+}
+
+static int mcp23s08_read_regs(struct mcp23s08 *mcp, unsigned reg, u16 *vals, unsigned n)
+{
+	u8	tx[2], *tmp;
+	int	status;
+
+	if ((n + reg) > sizeof(mcp->cache))
+		return -EINVAL;
+	tx[0] = mcp->addr | 0x01;
+	tx[1] = reg;
+
+	tmp = (u8 *)vals;
+	status = spi_write_then_read(mcp->data, tx, sizeof(tx), tmp, n);
+	if (status >= 0) {
+		while (n--)
+			vals[n] = tmp[n]; /* expand to 16bit */
+	}
+	return status;
+}
+
+static const struct mcp23s08_ops mcp23s08_ops = {
+	.read		= mcp23s08_read,
+	.write		= mcp23s08_write,
+	.read_regs	= mcp23s08_read_regs,
+};
+
+#else /* NOT MCP23S08_LEGACY */
+
 static int mcp23sxx_spi_write(void *context, const void *data, size_t count)
 {
 	struct mcp23s08 *mcp = context;
 	struct spi_device *spi = to_spi_device(mcp->dev);
-	struct spi_message m;
-	struct spi_transfer t[2] = { { .tx_buf = &mcp->addr, .len = 1, },
-				     { .tx_buf = data, .len = count, }, };
-
+    struct spi_message m;
+	struct spi_transfer t[2] = { { .tx_buf = &mcp->addr, .len = 1, }, 
+    { .tx_buf = data, .len = count, }, };
+    
 	spi_message_init(&m);
 	spi_message_add_tail(&t[0], &m);
 	spi_message_add_tail(&t[1], &m);
-
-	return spi_sync(spi, &m);
+	return spi_sync(spi, &m);    
 }
 
 static int mcp23sxx_spi_gather_write(void *context,
@@ -333,7 +400,8 @@ static int mcp23sxx_spi_gather_write(void *context,
 {
 	struct mcp23s08 *mcp = context;
 	struct spi_device *spi = to_spi_device(mcp->dev);
-	struct spi_message m;
+    
+    struct spi_message m;
 	struct spi_transfer t[3] = { { .tx_buf = &mcp->addr, .len = 1, },
 				     { .tx_buf = reg, .len = reg_size, },
 				     { .tx_buf = val, .len = val_size, }, };
@@ -342,7 +410,7 @@ static int mcp23sxx_spi_gather_write(void *context,
 	spi_message_add_tail(&t[0], &m);
 	spi_message_add_tail(&t[1], &m);
 	spi_message_add_tail(&t[2], &m);
-
+    
 	return spi_sync(spi, &m);
 }
 
@@ -352,7 +420,7 @@ static int mcp23sxx_spi_read(void *context, const void *reg, size_t reg_size,
 	struct mcp23s08 *mcp = context;
 	struct spi_device *spi = to_spi_device(mcp->dev);
 	u8 tx[2];
-
+    
 	if (reg_size != 1)
 		return -EINVAL;
 
@@ -361,12 +429,14 @@ static int mcp23sxx_spi_read(void *context, const void *reg, size_t reg_size,
 
 	return spi_write_then_read(spi, tx, sizeof(tx), val, val_size);
 }
-
 static const struct regmap_bus mcp23sxx_spi_regmap = {
 	.write = mcp23sxx_spi_write,
 	.gather_write = mcp23sxx_spi_gather_write,
 	.read = mcp23sxx_spi_read,
 };
+
+#endif /* NOT MCP23S08_LEGACY */
+
 
 #endif /* CONFIG_SPI_MASTER */
 
@@ -814,6 +884,10 @@ static int mcp23s08_probe_one(struct mcp23s08 *mcp, struct device *dev,
 			one_regmap_config =
 				devm_kmemdup(dev, &mcp23x08_regmap,
 					sizeof(struct regmap_config), GFP_KERNEL);
+                
+#ifdef MCP23S08_LEGACY
+    mcp->ops = &mcp23s08_ops;
+#endif
 			mcp->reg_shift = 0;
 			mcp->chip.ngpio = 8;
 			mcp->chip.label = "mcp23s08";
