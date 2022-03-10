@@ -888,31 +888,34 @@ static int mcp23s08_probe_one(struct mcp23s08 *mcp, struct device *dev,
 	case MCP_TYPE_S17:
 		switch (type) {
 		case MCP_TYPE_S08:
+#ifdef MCP23S08_LEGACY
+            mcp->ops = &mcp23s08_ops;
+#else
 			one_regmap_config =
 				devm_kmemdup(dev, &mcp23x08_regmap,
-					sizeof(struct regmap_config), GFP_KERNEL);
-
-#ifdef MCP23S08_LEGACY
-    mcp->ops = &mcp23s08_ops;
+					sizeof(struct regmap_config), GFP_KERNEL);    
 #endif
 			mcp->reg_shift = 0;
 			mcp->chip.ngpio = 8;
 			mcp->chip.label = "mcp23s08";
 			break;
 		case MCP_TYPE_S17:
+#ifndef MCP23S08_LEGACY
 			one_regmap_config =
 				devm_kmemdup(dev, &mcp23x17_regmap,
 					sizeof(struct regmap_config), GFP_KERNEL);
+#endif
 			mcp->reg_shift = 1;
 			mcp->chip.ngpio = 16;
 			mcp->chip.label = "mcp23s17";
 			break;
 		}
-		if (!one_regmap_config)
-			return -ENOMEM;
-
-
+		
+		
 #ifndef MCP23S08_LEGACY
+		if (!one_regmap_config){
+			return -ENOMEM;
+        }
 		one_regmap_config->name = devm_kasprintf(dev, GFP_KERNEL, "%d", (addr & ~0x40) >> 1);
 		mcp->regmap = devm_regmap_init(dev,
 				&mcp23sxx_spi_regmap, mcp,
@@ -922,9 +925,9 @@ static int mcp23s08_probe_one(struct mcp23s08 *mcp, struct device *dev,
 		break;
 
 	case MCP_TYPE_S18:
+#ifndef MCP23S08_LEGACY
 		if (!one_regmap_config)
 			return -ENOMEM;
-#ifndef MCP23S08_LEGACY
 		mcp->regmap = devm_regmap_init(dev, &mcp23sxx_spi_regmap, mcp,
 					       &mcp23x17_regmap);
 #endif
