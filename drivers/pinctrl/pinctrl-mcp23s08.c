@@ -492,8 +492,6 @@ static int mcp23s08_probe_one(struct mcp23s08 *mcp, struct device *dev,
 		mcp->irq_active_high =
 			of_property_read_bool(mcp->chip.parent->of_node,
 					      "microchip,irq-active-high");
-
-		mirror = pdata->mirror;
 	}
 
 	if ((status & IOCON_SEQOP) || !(status & IOCON_HAEN) || mirror ||
@@ -549,7 +547,7 @@ static int mcp23s08_probe_one(struct mcp23s08 *mcp, struct device *dev,
 			goto fail;
 	}
 
-	status = gpiochip_add_data(&mcp->chip, mcp);
+	status = gpiochip_add(&mcp->chip);
 	if (status < 0)
 		goto fail;
 
