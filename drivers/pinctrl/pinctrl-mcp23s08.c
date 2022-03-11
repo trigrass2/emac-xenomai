@@ -276,7 +276,7 @@ static void mcp23s08_irq_unmask(struct irq_data *data)
 	struct mcp23s08 *mcp = irq_data_get_irq_chip_data(data);
 	unsigned int pos = data->hwirq;
 
-	mcp->cache[MCP_GPINTEN] |= BIT(pos)
+	mcp->cache[MCP_GPINTEN] |= BIT(pos);
 }
 
 static int mcp23s08_irq_set_type(struct irq_data *data, unsigned int type)
