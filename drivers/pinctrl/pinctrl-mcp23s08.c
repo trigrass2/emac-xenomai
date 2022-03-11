@@ -543,7 +543,7 @@ static int mcp23s08_probe_one(struct mcp23s08 *mcp, struct device *dev,
 	/* disable irqs */
 	if (mcp->cache[MCP_GPINTEN] != 0) {
 		mcp->cache[MCP_GPINTEN] = 0;
-        printk("MCP DISABLED THE IRQ")
+        printk("MCP DISABLED THE IRQ");
 		status = mcp->ops->write(mcp, MCP_GPINTEN, 0);
 		if (status < 0)
 			goto fail;
