@@ -6,6 +6,7 @@
 #include <linux/property.h>
 #include <linux/regmap.h>
 #include <linux/spi/spi.h>
+#include <linux/overflow.h>
 
 #include "pinctrl-mcp23s08.h"
 

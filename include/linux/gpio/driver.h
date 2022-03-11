@@ -20,6 +20,253 @@ struct module;
 
 #ifdef CONFIG_GPIOLIB
 
+
+
+
+/**
+ * struct gpio_irq_chip - GPIO interrupt controller
+ */
+struct gpio_irq_chip {
+	/**
+	 * @chip:
+	 *
+	 * GPIO IRQ chip implementation, provided by GPIO driver.
+	 */
+	struct irq_chip *chip;
+
+	/**
+	 * @domain:
+	 *
+	 * Interrupt translation domain; responsible for mapping between GPIO
+	 * hwirq number and Linux IRQ number.
+	 */
+	struct irq_domain *domain;
+
+	/**
+	 * @domain_ops:
+	 *
+	 * Table of interrupt domain operations for this IRQ chip.
+	 */
+	const struct irq_domain_ops *domain_ops;
+
+#ifdef CONFIG_IRQ_DOMAIN_HIERARCHY
+	/**
+	 * @fwnode:
+	 *
+	 * Firmware node corresponding to this gpiochip/irqchip, necessary
+	 * for hierarchical irqdomain support.
+	 */
+	struct fwnode_handle *fwnode;
+
+	/**
+	 * @parent_domain:
+	 *
+	 * If non-NULL, will be set as the parent of this GPIO interrupt
+	 * controller's IRQ domain to establish a hierarchical interrupt
+	 * domain. The presence of this will activate the hierarchical
+	 * interrupt support.
+	 */
+	struct irq_domain *parent_domain;
+
+	/**
+	 * @child_to_parent_hwirq:
+	 *
+	 * This callback translates a child hardware IRQ offset to a parent
+	 * hardware IRQ offset on a hierarchical interrupt chip. The child
+	 * hardware IRQs correspond to the GPIO index 0..ngpio-1 (see the
+	 * ngpio field of struct gpio_chip) and the corresponding parent
+	 * hardware IRQ and type (such as IRQ_TYPE_*) shall be returned by
+	 * the driver. The driver can calculate this from an offset or using
+	 * a lookup table or whatever method is best for this chip. Return
+	 * 0 on successful translation in the driver.
+	 *
+	 * If some ranges of hardware IRQs do not have a corresponding parent
+	 * HWIRQ, return -EINVAL, but also make sure to fill in @valid_mask and
+	 * @need_valid_mask to make these GPIO lines unavailable for
+	 * translation.
+	 */
+	int (*child_to_parent_hwirq)(struct gpio_chip *gc,
+				     unsigned int child_hwirq,
+				     unsigned int child_type,
+				     unsigned int *parent_hwirq,
+				     unsigned int *parent_type);
+
+	/**
+	 * @populate_parent_alloc_arg :
+	 *
+	 * This optional callback allocates and populates the specific struct
+	 * for the parent's IRQ domain. If this is not specified, then
+	 * &gpiochip_populate_parent_fwspec_twocell will be used. A four-cell
+	 * variant named &gpiochip_populate_parent_fwspec_fourcell is also
+	 * available.
+	 */
+	void *(*populate_parent_alloc_arg)(struct gpio_chip *gc,
+				       unsigned int parent_hwirq,
+				       unsigned int parent_type);
+
+	/**
+	 * @child_offset_to_irq:
+	 *
+	 * This optional callback is used to translate the child's GPIO line
+	 * offset on the GPIO chip to an IRQ number for the GPIO to_irq()
+	 * callback. If this is not specified, then a default callback will be
+	 * provided that returns the line offset.
+	 */
+	unsigned int (*child_offset_to_irq)(struct gpio_chip *gc,
+					    unsigned int pin);
+
+	/**
+	 * @child_irq_domain_ops:
+	 *
+	 * The IRQ domain operations that will be used for this GPIO IRQ
+	 * chip. If no operations are provided, then default callbacks will
+	 * be populated to setup the IRQ hierarchy. Some drivers need to
+	 * supply their own translate function.
+	 */
+	struct irq_domain_ops child_irq_domain_ops;
+#endif
+
+	/**
+	 * @handler:
+	 *
+	 * The IRQ handler to use (often a predefined IRQ core function) for
+	 * GPIO IRQs, provided by GPIO driver.
+	 */
+	irq_flow_handler_t handler;
+
+	/**
+	 * @default_type:
+	 *
+	 * Default IRQ triggering type applied during GPIO driver
+	 * initialization, provided by GPIO driver.
+	 */
+	unsigned int default_type;
+
+	/**
+	 * @lock_key:
+	 *
+	 * Per GPIO IRQ chip lockdep class for IRQ lock.
+	 */
+	struct lock_class_key *lock_key;
+
+	/**
+	 * @request_key:
+	 *
+	 * Per GPIO IRQ chip lockdep class for IRQ request.
+	 */
+	struct lock_class_key *request_key;
+
+	/**
+	 * @parent_handler:
+	 *
+	 * The interrupt handler for the GPIO chip's parent interrupts, may be
+	 * NULL if the parent interrupts are nested rather than cascaded.
+	 */
+	irq_flow_handler_t parent_handler;
+
+	/**
+	 * @parent_handler_data:
+	 *
+	 * Data associated, and passed to, the handler for the parent
+	 * interrupt.
+	 */
+	void *parent_handler_data;
+
+	/**
+	 * @num_parents:
+	 *
+	 * The number of interrupt parents of a GPIO chip.
+	 */
+	unsigned int num_parents;
+
+	/**
+	 * @parents:
+	 *
+	 * A list of interrupt parents of a GPIO chip. This is owned by the
+	 * driver, so the core will only reference this list, not modify it.
+	 */
+	unsigned int *parents;
+
+	/**
+	 * @map:
+	 *
+	 * A list of interrupt parents for each line of a GPIO chip.
+	 */
+	unsigned int *map;
+
+	/**
+	 * @threaded:
+	 *
+	 * True if set the interrupt handling uses nested threads.
+	 */
+	bool threaded;
+
+	/**
+	 * @init_hw: optional routine to initialize hardware before
+	 * an IRQ chip will be added. This is quite useful when
+	 * a particular driver wants to clear IRQ related registers
+	 * in order to avoid undesired events.
+	 */
+	int (*init_hw)(struct gpio_chip *gc);
+
+	/**
+	 * @init_valid_mask: optional routine to initialize @valid_mask, to be
+	 * used if not all GPIO lines are valid interrupts. Sometimes some
+	 * lines just cannot fire interrupts, and this routine, when defined,
+	 * is passed a bitmap in "valid_mask" and it will have ngpios
+	 * bits from 0..(ngpios-1) set to "1" as in valid. The callback can
+	 * then directly set some bits to "0" if they cannot be used for
+	 * interrupts.
+	 */
+	void (*init_valid_mask)(struct gpio_chip *gc,
+				unsigned long *valid_mask,
+				unsigned int ngpios);
+
+	/**
+	 * @valid_mask:
+	 *
+	 * If not %NULL holds bitmask of GPIOs which are valid to be included
+	 * in IRQ domain of the chip.
+	 */
+	unsigned long *valid_mask;
+
+	/**
+	 * @first:
+	 *
+	 * Required for static IRQ allocation. If set, irq_domain_add_simple()
+	 * will allocate and map all IRQs during initialization.
+	 */
+	unsigned int first;
+
+	/**
+	 * @irq_enable:
+	 *
+	 * Store old irq_chip irq_enable callback
+	 */
+	void		(*irq_enable)(struct irq_data *data);
+
+	/**
+	 * @irq_disable:
+	 *
+	 * Store old irq_chip irq_disable callback
+	 */
+	void		(*irq_disable)(struct irq_data *data);
+	/**
+	 * @irq_unmask:
+	 *
+	 * Store old irq_chip irq_unmask callback
+	 */
+	void		(*irq_unmask)(struct irq_data *data);
+
+	/**
+	 * @irq_mask:
+	 *
+	 * Store old irq_chip irq_mask callback
+	 */
+	void		(*irq_mask)(struct irq_data *data);
+};
+
+
 /**
  * struct gpio_chip - abstract a GPIO controller
  * @label: a functional name for the GPIO device, such as a part
@@ -164,6 +411,7 @@ struct gpio_chip {
 	 * With CONFIG_GPIOLIB_IRQCHIP we get an irqchip inside the gpiolib
 	 * to handle IRQs for most practical cases.
 	 */
+	struct gpio_irq_chip 	irq;
 	struct irq_chip		*irqchip;
 	struct irq_domain	*irqdomain;
 	unsigned int		irq_base;

@@ -71,6 +71,8 @@ struct fwnode_operations {
 	void (*get)(struct fwnode_handle *fwnode);
 	void (*put)(struct fwnode_handle *fwnode);
 	bool (*device_is_available)(const struct fwnode_handle *fwnode);
+	const void *(*device_get_match_data)(const struct fwnode_handle *fwnode,
+					     const struct device *dev);
 	bool (*property_present)(const struct fwnode_handle *fwnode,
 				 const char *propname);
 	int (*property_read_int_array)(const struct fwnode_handle *fwnode,

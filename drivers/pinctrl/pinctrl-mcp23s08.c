@@ -419,7 +419,7 @@ static irqreturn_t mcp23s08_irq(int irq, void *data)
 		    ((gpio_bit_changed || intcap_changed) &&
 			(BIT(i) & mcp->irq_fall) && !gpio_set) ||
 		    defval_changed) {
-			child_irq = irq_find_mapping(mcp->chip.irq.domain, i);
+			child_irq = irq_find_mapping(mcp->chip.irqdomain, i);
 			handle_nested_irq(child_irq);
 		}
 	}
@@ -563,8 +563,10 @@ int mcp23s08_probe_one(struct mcp23s08 *mcp, struct device *dev,
 	 */
 
 	ret = mcp_read(mcp, MCP_IOCON, &status);
-	if (ret < 0)
-		return dev_err_probe(dev, ret, "can't identify chip %d\n", addr);
+	if (ret < 0){
+		dev_dbg(dev, "can't identify chip %d\n", addr);
+		return -1;
+	}
 
 	mcp->irq_controller =
 		device_property_read_bool(dev, "interrupt-controller");
@@ -597,8 +599,10 @@ int mcp23s08_probe_one(struct mcp23s08 *mcp, struct device *dev,
 			status |= IOCON_INTCC | (IOCON_INTCC << 8);
 
 		ret = mcp_write(mcp, MCP_IOCON, status);
-		if (ret < 0)
-			return dev_err_probe(dev, ret, "can't write IOCON %d\n", addr);
+		if (ret < 0){
+			dev_dbg(dev, "can't write IOCON %d \n", addr);
+			return -1;
+		}
 	}
 
 	if (mcp->irq && mcp->irq_controller) {
@@ -615,9 +619,10 @@ int mcp23s08_probe_one(struct mcp23s08 *mcp, struct device *dev,
 	}
 
 	ret = devm_gpiochip_add_data(dev, &mcp->chip, mcp);
-	if (ret < 0)
-		return dev_err_probe(dev, ret, "can't add GPIO chip\n");
-
+	if (ret < 0){
+		dev_dbg(dev,"can't add GPIO chip\n");
+		return -1;
+	}
 	mcp->pinctrl_desc.pctlops = &mcp_pinctrl_ops;
 	mcp->pinctrl_desc.confops = &mcp_pinconf_ops;
 	mcp->pinctrl_desc.npins = mcp->chip.ngpio;
@@ -628,13 +633,16 @@ int mcp23s08_probe_one(struct mcp23s08 *mcp, struct device *dev,
 	mcp->pinctrl_desc.owner = THIS_MODULE;
 
 	mcp->pctldev = devm_pinctrl_register(dev, &mcp->pinctrl_desc, mcp);
-	if (IS_ERR(mcp->pctldev))
-		return dev_err_probe(dev, PTR_ERR(mcp->pctldev), "can't register controller\n");
-
+	if (IS_ERR(mcp->pctldev)){
+		dev_dbg(dev, "can't register controller\n");
+		return -1;
+	}
 	if (mcp->irq) {
 		ret = mcp23s08_irq_setup(mcp);
-		if (ret)
-			return dev_err_probe(dev, ret, "can't setup IRQ\n");
+		if (ret){
+			dev_dbg(dev, "can't setup IRQ\n");
+			return -1;
+		}
 	}
 
 	return 0;
