@@ -156,7 +156,7 @@ static const struct mcp23s08_ops mcp23s08_ops = {
 
 static int mcp23s08_direction_input(struct gpio_chip *chip, unsigned offset)
 {
-	struct mcp23s08	*mcp = gpiochip_get_data(chip);
+	struct mcp23s08	*mcp = container_of(chip, struct mcp23s08, chip);
 	int status;
 
 	mutex_lock(&mcp->lock);
@@ -168,7 +168,7 @@ static int mcp23s08_direction_input(struct gpio_chip *chip, unsigned offset)
 
 static int mcp23s08_get(struct gpio_chip *chip, unsigned offset)
 {
-	struct mcp23s08	*mcp = gpiochip_get_data(chip);
+	struct mcp23s08	*mcp = container_of(chip, struct mcp23s08, chip);
 	int status;
 
 	mutex_lock(&mcp->lock);
@@ -199,7 +199,7 @@ static int __mcp23s08_set(struct mcp23s08 *mcp, unsigned mask, int value)
 
 static void mcp23s08_set(struct gpio_chip *chip, unsigned offset, int value)
 {
-	struct mcp23s08	*mcp = gpiochip_get_data(chip);
+	struct mcp23s08	*mcp = container_of(chip, struct mcp23s08, chip);
 	unsigned mask = 1 << offset;
 
 	mutex_lock(&mcp->lock);
@@ -210,7 +210,7 @@ static void mcp23s08_set(struct gpio_chip *chip, unsigned offset, int value)
 static int
 mcp23s08_direction_output(struct gpio_chip *chip, unsigned offset, int value)
 {
-	struct mcp23s08	*mcp = gpiochip_get_data(chip);
+	struct mcp23s08	*mcp = container_of(chip, struct mcp23s08, chip);
 	unsigned mask = 1 << offset;
 	int status;
 
@@ -265,8 +265,7 @@ static irqreturn_t mcp23s08_irq(int irq, void *data)
 
 static void mcp23s08_irq_mask(struct irq_data *data)
 {
-	struct gpio_chip *gc = irq_data_get_irq_chip_data(data);
-	struct mcp23s08 *mcp = gpiochip_get_data(gc);
+	struct mcp23s08 *mcp = irq_data_get_irq_chip_data(data);
 	unsigned int pos = data->hwirq;
 
 	mcp->cache[MCP_GPINTEN] &= ~BIT(pos);
@@ -274,17 +273,15 @@ static void mcp23s08_irq_mask(struct irq_data *data)
 
 static void mcp23s08_irq_unmask(struct irq_data *data)
 {
-	struct gpio_chip *gc = irq_data_get_irq_chip_data(data);
-	struct mcp23s08 *mcp = gpiochip_get_data(gc);
+	struct mcp23s08 *mcp = irq_data_get_irq_chip_data(data);
 	unsigned int pos = data->hwirq;
 
-	mcp->cache[MCP_GPINTEN] |= BIT(pos);
+	mcp->cache[MCP_GPINTEN] |= BIT(pos)
 }
 
 static int mcp23s08_irq_set_type(struct irq_data *data, unsigned int type)
 {
-	struct gpio_chip *gc = irq_data_get_irq_chip_data(data);
-	struct mcp23s08 *mcp = gpiochip_get_data(gc);
+	struct mcp23s08 *mcp = irq_data_get_irq_chip_data(data);
 	unsigned int pos = data->hwirq;
 	int status = 0;
 
@@ -314,17 +311,14 @@ static int mcp23s08_irq_set_type(struct irq_data *data, unsigned int type)
 
 static void mcp23s08_irq_bus_lock(struct irq_data *data)
 {
-	struct gpio_chip *gc = irq_data_get_irq_chip_data(data);
-	struct mcp23s08 *mcp = gpiochip_get_data(gc);
+    struct mcp23s08 *mcp = irq_data_get_irq_chip_data(data);
 
 	mutex_lock(&mcp->irq_lock);
 }
 
 static void mcp23s08_irq_bus_unlock(struct irq_data *data)
 {
-	struct gpio_chip *gc = irq_data_get_irq_chip_data(data);
-	struct mcp23s08 *mcp = gpiochip_get_data(gc);
-
+    struct mcp23s08 *mcp = irq_data_get_irq_chip_data(data);
 	mutex_lock(&mcp->lock);
 	mcp->ops->write(mcp, MCP_GPINTEN, mcp->cache[MCP_GPINTEN]);
 	mcp->ops->write(mcp, MCP_DEFVAL, mcp->cache[MCP_DEFVAL]);
