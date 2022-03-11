@@ -97,67 +97,6 @@ struct mcp23s08_driver_data {
 
 /*----------------------------------------------------------------------*/
 
-#if IS_ENABLED(CONFIG_I2C)
-
-static int mcp23008_read(struct mcp23s08 *mcp, unsigned reg)
-{
-	return i2c_smbus_read_byte_data(mcp->data, reg);
-}
-
-static int mcp23008_write(struct mcp23s08 *mcp, unsigned reg, unsigned val)
-{
-	return i2c_smbus_write_byte_data(mcp->data, reg, val);
-}
-
-static int
-mcp23008_read_regs(struct mcp23s08 *mcp, unsigned reg, u16 *vals, unsigned n)
-{
-	while (n--) {
-		int ret = mcp23008_read(mcp, reg++);
-		if (ret < 0)
-			return ret;
-		*vals++ = ret;
-	}
-
-	return 0;
-}
-
-static int mcp23017_read(struct mcp23s08 *mcp, unsigned reg)
-{
-	return i2c_smbus_read_word_data(mcp->data, reg << 1);
-}
-
-static int mcp23017_write(struct mcp23s08 *mcp, unsigned reg, unsigned val)
-{
-	return i2c_smbus_write_word_data(mcp->data, reg << 1, val);
-}
-
-static int
-mcp23017_read_regs(struct mcp23s08 *mcp, unsigned reg, u16 *vals, unsigned n)
-{
-	while (n--) {
-		int ret = mcp23017_read(mcp, reg++);
-		if (ret < 0)
-			return ret;
-		*vals++ = ret;
-	}
-
-	return 0;
-}
-
-static const struct mcp23s08_ops mcp23008_ops = {
-	.read		= mcp23008_read,
-	.write		= mcp23008_write,
-	.read_regs	= mcp23008_read_regs,
-};
-
-static const struct mcp23s08_ops mcp23017_ops = {
-	.read		= mcp23017_read,
-	.write		= mcp23017_write,
-	.read_regs	= mcp23017_read_regs,
-};
-
-#endif /* CONFIG_I2C */
 
 /*----------------------------------------------------------------------*/
 
@@ -204,59 +143,11 @@ mcp23s08_read_regs(struct mcp23s08 *mcp, unsigned reg, u16 *vals, unsigned n)
 	return status;
 }
 
-static int mcp23s17_read(struct mcp23s08 *mcp, unsigned reg)
-{
-	u8	tx[2], rx[2];
-	int	status;
-
-	tx[0] = mcp->addr | 0x01;
-	tx[1] = reg << 1;
-	status = spi_write_then_read(mcp->data, tx, sizeof(tx), rx, sizeof(rx));
-	return (status < 0) ? status : (rx[0] | (rx[1] << 8));
-}
-
-static int mcp23s17_write(struct mcp23s08 *mcp, unsigned reg, unsigned val)
-{
-	u8	tx[4];
-
-	tx[0] = mcp->addr;
-	tx[1] = reg << 1;
-	tx[2] = val;
-	tx[3] = val >> 8;
-	return spi_write_then_read(mcp->data, tx, sizeof(tx), NULL, 0);
-}
-
-static int
-mcp23s17_read_regs(struct mcp23s08 *mcp, unsigned reg, u16 *vals, unsigned n)
-{
-	u8	tx[2];
-	int	status;
-
-	if ((n + reg) > sizeof(mcp->cache))
-		return -EINVAL;
-	tx[0] = mcp->addr | 0x01;
-	tx[1] = reg << 1;
-
-	status = spi_write_then_read(mcp->data, tx, sizeof(tx),
-				     (u8 *)vals, n * 2);
-	if (status >= 0) {
-		while (n--)
-			vals[n] = __le16_to_cpu((__le16)vals[n]);
-	}
-
-	return status;
-}
 
 static const struct mcp23s08_ops mcp23s08_ops = {
 	.read		= mcp23s08_read,
 	.write		= mcp23s08_write,
 	.read_regs	= mcp23s08_read_regs,
-};
-
-static const struct mcp23s08_ops mcp23s17_ops = {
-	.read		= mcp23s17_read,
-	.write		= mcp23s17_write,
-	.read_regs	= mcp23s17_read_regs,
 };
 
 #endif /* CONFIG_SPI_MASTER */
@@ -576,33 +467,7 @@ static int mcp23s08_probe_one(struct mcp23s08 *mcp, struct device *dev,
 		mcp->chip.ngpio = 8;
 		mcp->chip.label = "mcp23s08";
 		break;
-
-	case MCP_TYPE_S17:
-		mcp->ops = &mcp23s17_ops;
-		mcp->chip.ngpio = 16;
-		mcp->chip.label = "mcp23s17";
-		break;
-
-	case MCP_TYPE_S18:
-		mcp->ops = &mcp23s17_ops;
-		mcp->chip.ngpio = 16;
-		mcp->chip.label = "mcp23s18";
-		break;
 #endif /* CONFIG_SPI_MASTER */
-
-#if IS_ENABLED(CONFIG_I2C)
-	case MCP_TYPE_008:
-		mcp->ops = &mcp23008_ops;
-		mcp->chip.ngpio = 8;
-		mcp->chip.label = "mcp23008";
-		break;
-
-	case MCP_TYPE_017:
-		mcp->ops = &mcp23017_ops;
-		mcp->chip.ngpio = 16;
-		mcp->chip.label = "mcp23017";
-		break;
-#endif /* CONFIG_I2C */
 
 	default:
 		dev_err(dev, "invalid device type (%d)\n", type);
@@ -637,15 +502,21 @@ static int mcp23s08_probe_one(struct mcp23s08 *mcp, struct device *dev,
 		status &= ~(IOCON_SEQOP | (IOCON_SEQOP << 8));
 		status |= IOCON_HAEN | (IOCON_HAEN << 8);
 		if (mcp->irq_active_high)
+        {
 			status |= IOCON_INTPOL | (IOCON_INTPOL << 8);
+            printk("status |= 8 ");
+        }
 		else
+        {
 			status &= ~(IOCON_INTPOL | (IOCON_INTPOL << 8));
+            printk("status &= 8 ");
+        }
 
 		if (mirror)
+        {
 			status |= IOCON_MIRROR | (IOCON_MIRROR << 8);
-
-		if (type == MCP_TYPE_S18)
-			status |= IOCON_INTCC | (IOCON_INTCC << 8);
+            printk("MIRROR ENABLED");
+        }
 
 		status = mcp->ops->write(mcp, MCP_IOCON, status);
 		if (status < 0)
@@ -672,6 +543,7 @@ static int mcp23s08_probe_one(struct mcp23s08 *mcp, struct device *dev,
 	/* disable irqs */
 	if (mcp->cache[MCP_GPINTEN] != 0) {
 		mcp->cache[MCP_GPINTEN] = 0;
+        printk("MCP DISABLED THE IRQ")
 		status = mcp->ops->write(mcp, MCP_GPINTEN, 0);
 		if (status < 0)
 			goto fail;
@@ -703,151 +575,12 @@ static const struct of_device_id mcp23s08_spi_of_match[] = {
 		.compatible = "microchip,mcp23s08",
 		.data = (void *) MCP_TYPE_S08,
 	},
-	{
-		.compatible = "microchip,mcp23s17",
-		.data = (void *) MCP_TYPE_S17,
-	},
-	{
-		.compatible = "microchip,mcp23s18",
-		.data = (void *) MCP_TYPE_S18,
-	},
-/* NOTE: The use of the mcp prefix is deprecated and will be removed. */
-	{
-		.compatible = "mcp,mcp23s08",
-		.data = (void *) MCP_TYPE_S08,
-	},
-	{
-		.compatible = "mcp,mcp23s17",
-		.data = (void *) MCP_TYPE_S17,
-	},
 	{ },
 };
 MODULE_DEVICE_TABLE(of, mcp23s08_spi_of_match);
 #endif
 
-#if IS_ENABLED(CONFIG_I2C)
-static const struct of_device_id mcp23s08_i2c_of_match[] = {
-	{
-		.compatible = "microchip,mcp23008",
-		.data = (void *) MCP_TYPE_008,
-	},
-	{
-		.compatible = "microchip,mcp23017",
-		.data = (void *) MCP_TYPE_017,
-	},
-/* NOTE: The use of the mcp prefix is deprecated and will be removed. */
-	{
-		.compatible = "mcp,mcp23008",
-		.data = (void *) MCP_TYPE_008,
-	},
-	{
-		.compatible = "mcp,mcp23017",
-		.data = (void *) MCP_TYPE_017,
-	},
-	{ },
-};
-MODULE_DEVICE_TABLE(of, mcp23s08_i2c_of_match);
-#endif
 #endif /* CONFIG_OF */
-
-
-#if IS_ENABLED(CONFIG_I2C)
-
-static int mcp230xx_probe(struct i2c_client *client,
-				    const struct i2c_device_id *id)
-{
-	struct mcp23s08_platform_data *pdata, local_pdata;
-	struct mcp23s08 *mcp;
-	int status;
-	const struct of_device_id *match;
-
-	match = of_match_device(of_match_ptr(mcp23s08_i2c_of_match),
-					&client->dev);
-	if (match) {
-		pdata = &local_pdata;
-		pdata->base = -1;
-		pdata->chip[0].pullups = 0;
-		pdata->irq_controller =	of_property_read_bool(
-					client->dev.of_node,
-					"interrupt-controller");
-		pdata->mirror = of_property_read_bool(client->dev.of_node,
-						      "microchip,irq-mirror");
-		client->irq = irq_of_parse_and_map(client->dev.of_node, 0);
-	} else {
-		pdata = dev_get_platdata(&client->dev);
-		if (!pdata) {
-			pdata = devm_kzalloc(&client->dev,
-					sizeof(struct mcp23s08_platform_data),
-					GFP_KERNEL);
-			if (!pdata)
-				return -ENOMEM;
-			pdata->base = -1;
-		}
-	}
-
-	mcp = kzalloc(sizeof(*mcp), GFP_KERNEL);
-	if (!mcp)
-		return -ENOMEM;
-
-	mcp->irq = client->irq;
-	status = mcp23s08_probe_one(mcp, &client->dev, client, client->addr,
-				    id->driver_data, pdata, 0);
-	if (status)
-		goto fail;
-
-	i2c_set_clientdata(client, mcp);
-
-	return 0;
-
-fail:
-	kfree(mcp);
-
-	return status;
-}
-
-static int mcp230xx_remove(struct i2c_client *client)
-{
-	struct mcp23s08 *mcp = i2c_get_clientdata(client);
-
-	gpiochip_remove(&mcp->chip);
-	kfree(mcp);
-
-	return 0;
-}
-
-static const struct i2c_device_id mcp230xx_id[] = {
-	{ "mcp23008", MCP_TYPE_008 },
-	{ "mcp23017", MCP_TYPE_017 },
-	{ },
-};
-MODULE_DEVICE_TABLE(i2c, mcp230xx_id);
-
-static struct i2c_driver mcp230xx_driver = {
-	.driver = {
-		.name	= "mcp230xx",
-		.of_match_table = of_match_ptr(mcp23s08_i2c_of_match),
-	},
-	.probe		= mcp230xx_probe,
-	.remove		= mcp230xx_remove,
-	.id_table	= mcp230xx_id,
-};
-
-static int __init mcp23s08_i2c_init(void)
-{
-	return i2c_add_driver(&mcp230xx_driver);
-}
-
-static void mcp23s08_i2c_exit(void)
-{
-	i2c_del_driver(&mcp230xx_driver);
-}
-
-#else
-
-static int __init mcp23s08_i2c_init(void) { return 0; }
-static void mcp23s08_i2c_exit(void) { }
-
-#endif /* CONFIG_I2C */
 
 /*----------------------------------------------------------------------*/
 
@@ -910,6 +643,7 @@ static int mcp23s08_probe(struct spi_device *spi)
 				continue;
 			chips++;
 			if ((type == MCP_TYPE_S08) && (addr > 3)) {
+                printk("JOSEPH THIS IS NOT THE RIGHT ADDRESS CAN ONLY HAVE 3");
 				dev_err(&spi->dev,
 					"mcp23s08 only supports address 0..3\n");
 				return -EINVAL;
@@ -984,8 +718,6 @@ static int mcp23s08_remove(struct spi_device *spi)
 
 static const struct spi_device_id mcp23s08_ids[] = {
 	{ "mcp23s08", MCP_TYPE_S08 },
-	{ "mcp23s17", MCP_TYPE_S17 },
-	{ "mcp23s18", MCP_TYPE_S18 },
 	{ },
 };
 MODULE_DEVICE_TABLE(spi, mcp23s08_ids);
@@ -1022,19 +754,13 @@ static void mcp23s08_spi_exit(void) { }
 static int __init mcp23s08_init(void)
 {
 	int ret;
-
+    
 	ret = mcp23s08_spi_init();
 	if (ret)
 		goto spi_fail;
 
-	ret = mcp23s08_i2c_init();
-	if (ret)
-		goto i2c_fail;
-
 	return 0;
 
- i2c_fail:
-	mcp23s08_spi_exit();
  spi_fail:
 	return ret;
 }
@@ -1046,7 +772,6 @@ subsys_initcall(mcp23s08_init);
 static void __exit mcp23s08_exit(void)
 {
 	mcp23s08_spi_exit();
-	mcp23s08_i2c_exit();
 }
 module_exit(mcp23s08_exit);
 
