@@ -25,6 +25,9 @@
  */
 static struct gpio_desc *reset_gpio;
 
+#define DEFAULT_TIMEOUT_MS 3000
+static u32 timeout = DEFAULT_TIMEOUT_MS;
+
 static void gpio_poweroff_do_poweroff(void)
 {
 	BUG_ON(!reset_gpio);
@@ -39,8 +42,8 @@ static void gpio_poweroff_do_poweroff(void)
 	/* drive it active, also inactive->active edge */
 	gpiod_set_value(reset_gpio, 1);
 
-	/* give it some time */
-	mdelay(3000);
+    /* give it some time */
+	mdelay(timeout);
 
 	WARN_ON(1);
 }
@@ -63,6 +66,8 @@ static int gpio_poweroff_probe(struct platform_device *pdev)
 		flags = GPIOD_IN;
 	else
 		flags = GPIOD_OUT_LOW;
+
+    of_property_read_u32(&pdev->dev.of_node, "timeout-ms", &timeout);
 
 	reset_gpio = devm_gpiod_get(&pdev->dev, NULL, flags);
 	if (IS_ERR(reset_gpio))
