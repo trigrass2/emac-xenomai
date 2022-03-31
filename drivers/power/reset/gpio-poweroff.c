@@ -67,7 +67,7 @@ static int gpio_poweroff_probe(struct platform_device *pdev)
 	else
 		flags = GPIOD_OUT_LOW;
 
-    of_property_read_u32(&pdev->dev.of_node, "timeout-ms", &timeout);
+        of_property_read_u32(pdev->dev.of_node, "timeout-ms", &timeout);
 
 	reset_gpio = devm_gpiod_get(&pdev->dev, NULL, flags);
 	if (IS_ERR(reset_gpio))
